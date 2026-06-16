@@ -8,6 +8,7 @@ from __future__ import annotations
 from typing import Any, Optional
 
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, ValidationError
 
 from . import engine as eng
@@ -16,6 +17,12 @@ from .models import GameConfig
 from .translator import get_translator
 
 app = FastAPI(title="SaS-Math AI — ai-layer", version="0.4.0")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 class TranslateReq(BaseModel):

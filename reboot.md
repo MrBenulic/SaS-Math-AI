@@ -13,12 +13,12 @@ deterministic **exact + Monte Carlo** math engine → auto-tuning solver → GLI
 
 ## 2. Current status
 - **Date:** 2026-06-16
-- **Version / milestone:** `v0.4.0-beta.1` — **M3 AI layer** on `beta`: FastAPI orchestration + a provider-agnostic AI Context Translator (rule-based, no API key) + a Rust JSON engine bridge. The full **prompt → JSON → simulate → tune** pipeline runs. (Next.js frontend = next slice.) M1 + M2 complete.
+- **Version / milestone:** `v0.4.0-beta.2` — **M3 complete (backend + frontend)** on `beta`: FastAPI ai-layer (provider-agnostic translator) + a **Next.js "Slot Studio"** UI (Tailwind/Zustand/Monaco) + a Rust JSON engine bridge. Full **prompt → JSON → simulate → tune works in the browser**. M1 + M2 complete.
 - **Branch:** `beta` (active work). `main` holds stable `v0.1.0`.
-- **Latest stable tag:** `v0.1.0` · **Latest beta tag:** `v0.4.0-beta.1`
+- **Latest stable tag:** `v0.1.0` · **Latest beta tag:** `v0.4.0-beta.2`
 - **Repo (private):** [`MrBenulic/SaS-Math-AI`](https://github.com/MrBenulic/SaS-Math-AI)
 - **Local path:** `~/Desktop/SaS-Math AI app`
-- **Verified (16 Rust + 6 Python tests green):** M1+M2 engine/solver; **M3 gate** — prompt "5x3, 20 lines, 96% RTP, medium vol, wild+scatter" → translate → simulate (149%) → tune → **96.00%** (realize-delta 0.0001), all via the AI layer calling the Rust engine. Run: `cd ai-layer && .venv/bin/python -m pytest -q`; or `.venv/bin/uvicorn app.main:app` then `POST /design`.
+- **Verified (16 Rust + 6 Python tests green; browser-verified):** **M3 gate IN BROWSER** — prompt "5x3, 20 lines, 96% RTP, medium vol, wild+scatter" → Translate → Simulate (149.19%) → Auto-tune → **96.00%** (realize-delta 0.01%, 1680 evals), via Next.js UI → FastAPI → Rust engine. Run: build `core-math` engine, `ai-layer` uvicorn (:8000), `frontend` `npm run dev` (:3000).
 
 ## 3. How to resume
 ```bash
@@ -52,11 +52,11 @@ git checkout beta                             # do new work on beta, never direc
   via CRN Monte Carlo). Weighted reels are **independent-cell** so the solver objective == re-verify
   (scatter games re-verify with <1% delta). Gate PASS. **Remaining:** full CMA-ES covariance; PyO3
   bindings; `ways_243`/buy-feature mechanics; (stable promotion needs external certified-game parity).
-- 🟦 **v0.4.0 M3 — AI + frontend** (in progress on `beta`, tag `v0.4.0-beta.1`): FastAPI `ai-layer`
-  with a provider-agnostic AI Context Translator (rule-based default; LLM adapter stub), Pydantic
-  models, the fixed mechanics library, and a Rust JSON engine bridge (`core-math/src/bin/engine.rs`).
-  prompt→JSON→simulate→tune pipeline green (6 Python tests). **Remaining:** Next.js + Tailwind +
-  Zustand + Monaco UI; schema→TS codegen; Playwright E2E; Postgres/SQLite persistence; real LLM wiring.
+- 🟦 **v0.4.0 M3 — AI + frontend** (on `beta`, tag `v0.4.0-beta.2`): FastAPI `ai-layer` (provider-
+  agnostic translator + fixed mechanics library) + a Rust JSON engine bridge (`core-math/src/bin/
+  engine.rs`) + a **Next.js "Slot Studio"** (Tailwind/Zustand/Monaco). prompt→JSON→simulate→tune works
+  in the browser (16 Rust + 6 Python tests; browser-verified). **Remaining:** schema→TS codegen;
+  Playwright E2E; Postgres/SQLite persistence; real LLM provider wiring.
 - ⏳ v1.0.0 M4 advanced mechanics + GLI/BMM exporter.
 
 ## 6. Open decisions / TODO
@@ -129,6 +129,14 @@ git checkout beta                             # do new work on beta, never direc
   simulate→tune; demo "5x3, 20 lines, 96% RTP, medium vol, wild+scatter" → 1.49 → **0.9600** RTP,
   realize-delta 0.0001. Tagged `v0.4.0-beta.1`. **Next M3:** Next.js/Tailwind/Zustand/Monaco UI;
   schema→TS codegen; Playwright; persistence; real LLM provider.
+- **2026-06-16 (M3 frontend)** — Next.js 16 + React 19 + Tailwind v4 + Zustand + Monaco "Slot Studio"
+  (`frontend/`): `app/page.tsx` (prompt → Monaco config → Simulate/Tune with RTP/vol/hit cards),
+  `lib/api.ts` (ai-layer client), `store/useStore.ts`. CORS added to the ai-layer. **Browser-verified**
+  via preview tools: Translate (POST /translate 200 → config in Monaco) → Simulate (149.19%) →
+  Auto-tune → **96.00%** (delta 0.01%, 1680 evals); `next build` type-checks clean. Tagged
+  `v0.4.0-beta.2`. **Next:** schema→TS codegen, Playwright E2E, persistence, real LLM provider; then
+  M4. To run the UI: `.claude/launch.json` `sas-frontend`, or `cd frontend && npm run dev` (needs
+  ai-layer uvicorn + core-math engine).
 
 ---
 
@@ -141,23 +149,25 @@ Local path: ~/Desktop/SaS-Math AI app  (private GitHub repo MrBenulic/SaS-Math-A
 FIRST: read reboot.md, CLAUDE.md, and docs/design-decisions.md in that folder — they hold the live
 status and the locked engineering decisions (ADRs). Then read docs/roadmap.md for what's next.
 
-Current state: M1 engine + M2 solver + M3 ai-layer (backend) are BUILT on `beta` (tag v0.4.0-beta.1).
-Rust core: exact closed-form + capped enumeration, independent-cell weight-reels, deterministic MC,
-and a multi-objective ES auto-tuner (RTP + volatility + hit-frequency). M3: a FastAPI ai-layer with a
-provider-agnostic AI Context Translator (rule-based default) calling the Rust engine via a JSON bridge
-(`bin/engine.rs`) — full prompt→JSON→simulate→tune pipeline. 16 Rust + 6 Python tests green. v0.1.0
-Foundation is on `main`. We work on `beta` and promote to `main` (tag vX.Y.Z) only after a milestone
-gate passes; we cut beta pre-releases as vX.Y.Z-beta.N. Always tag a stable point before risky changes.
+Current state: M1 engine + M2 solver + M3 (ai-layer + Next.js frontend) are BUILT on `beta` (tag
+v0.4.0-beta.2). Rust core: exact closed-form + capped enumeration, independent-cell weight-reels,
+deterministic MC, multi-objective ES auto-tuner (RTP + volatility + hit-frequency). M3: a FastAPI
+ai-layer (provider-agnostic translator) + a Next.js "Slot Studio" UI (Tailwind/Zustand/Monaco) calling
+the Rust engine via a JSON bridge (`bin/engine.rs`) — full prompt→JSON→simulate→tune works IN THE
+BROWSER. 16 Rust + 6 Python tests green. v0.1.0 Foundation is on `main`. We work on `beta` and promote
+to `main` (tag vX.Y.Z) only after a milestone gate passes; we cut beta pre-releases as vX.Y.Z-beta.N.
+Always tag a stable point before risky changes.
 
 Non-negotiables (see CLAUDE.md / ADRs): integer/u128 money accounting; counter-based NAMESPACED RNG
 (subsystem, spin, draw); the JSON schema is the single source of truth for TS + Pydantic + Rust serde;
 exact combinatorial math is the certification source of truth and MC only validates the harness +
 non-enumerable features; max-win cap is modeled inside the math; the LLM never writes code.
 
-Next: M3 frontend — Next.js + Tailwind + Zustand + Monaco config UI talking to the FastAPI ai-layer
-(schema→TS codegen, Playwright E2E, Postgres/SQLite persistence); optionally wire a real LLM provider
-into the translator stub. Other open items: M2 polish (full CMA-ES covariance, PyO3); stable promotion
-needs external CERTIFIED-game parity. To run the ai-layer: `cd ai-layer && python3 -m venv .venv &&
+Next: M3 polish — schema→TS codegen, Playwright E2E, Postgres/SQLite persistence, and wiring a real LLM
+provider into the translator stub; OR start M4 — advanced mechanics (cascades, expanding wilds,
+multipliers) + the GLI/BMM compliance exporter. (M3 ai-layer + Next.js Slot Studio are DONE and
+browser-verified.) Other open: M2 polish (CMA-ES covariance, PyO3); stable needs external CERTIFIED-game
+parity. To run the ai-layer: `cd ai-layer && python3 -m venv .venv &&
 .venv/bin/pip install -e '.[dev]'`, build `core-math` engine (`cargo build --release --bin engine`),
 then `.venv/bin/python -m pytest -q` or `.venv/bin/uvicorn app.main:app`. Do work on `beta`; keep
 reboot.md + the Excel tracker current.

@@ -99,6 +99,7 @@ SHEETS = {
             ["v0.3.0-beta.1", "beta", "2026-06-16", "M2 auto-tuner: ES weight-tuning to target RTP + realize/re-verify; gate PASS 139%->96% line game; 13 tests green", "last stable = v0.1.0; git checkout v0.1.0"],
             ["v0.3.0-beta.2", "beta", "2026-06-16", "M2 finished: scatter-consistent (independent-cell) + multi-objective (RTP+vol+hit); scatter re-verify delta 5.8%->0.3%; 16 tests green", "last stable = v0.1.0; git checkout v0.1.0"],
             ["v0.4.0-beta.1", "beta", "2026-06-16", "M3 ai-layer: FastAPI + provider-agnostic translator + Rust JSON engine bridge; prompt->JSON->simulate->tune pipeline; 6 Python tests", "last stable = v0.1.0; git checkout v0.1.0"],
+            ["v0.4.0-beta.2", "beta", "2026-06-16", "M3 frontend: Next.js Slot Studio (Tailwind/Zustand/Monaco); browser-verified prompt->translate->simulate->tune 149%->96%", "last stable = v0.1.0; git checkout v0.1.0"],
         ],
     },
 }
