@@ -95,6 +95,7 @@ SHEETS = {
         "rows": [
             ["v0.1.0", "stable", "2026-06-16", "Foundation: repo, stable/beta branching, ADRs, draft schema, workbook, plugins", "baseline checkpoint; git checkout v0.1.0"],
             ["v0.2.0-beta.1", "beta", "2026-06-16", "M1 core-math engine: namespaced RNG, integer accounting, exact+MC, CLI; 6 tests green (~19M spins/s)", "last stable = v0.1.0; git checkout v0.1.0"],
+            ["v0.2.0-beta.2", "beta", "2026-06-16", "M1 cont.: exact capped enumeration (cap-erosion) + weight-reels; provenance-labeled; 9 tests green", "last stable = v0.1.0; git checkout v0.1.0"],
         ],
     },
 }

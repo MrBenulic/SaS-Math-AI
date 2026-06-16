@@ -1,11 +1,21 @@
-//! Line / scatter pay "Lego blocks". The SAME payout semantics are used by both the exact
-//! engine and the Monte Carlo engine, so any agreement between them is meaningful.
+//! Line / scatter pay "Lego blocks" + the prepared engine model. The SAME payout semantics are
+//! used by both the exact engine and Monte Carlo, so agreement between them is meaningful.
 //!
-//! `Prepared` precomputes flat lookup tables from a `GameConfig` for allocation-free evaluation.
+//! Reels may be given as explicit strips or as per-symbol weights; weights are realized into a
+//! deterministic spread strip here (ADR-006), so everything downstream sees one representation.
 
 use crate::config::{GameConfig, LineEval, SymbolKind};
+use std::collections::HashMap;
 
 pub const MAX_REELS: usize = 16;
+pub const MAX_ROWS: usize = 8;
+
+/// One reel-stop's visible column: the symbol at each row, plus the scatter count in the window.
+#[derive(Debug, Clone)]
+pub struct ColumnInfo {
+    pub syms: [usize; MAX_ROWS],
+    pub scatters: u32,
+}
 
 pub struct Prepared {
     pub reels: usize,
@@ -15,6 +25,7 @@ pub struct Prepared {
     pub cap_units: u64,
     pub line_eval: LineEval,
     pub paylines: Vec<Vec<usize>>,
+    /// Realized reel strips (weights are spread into strips at prepare-time).
     pub strips: Vec<Vec<usize>>,
     pub strip_len: Vec<u32>,
     pub n_symbols: usize,
@@ -26,6 +37,38 @@ pub struct Prepared {
     pub scatter_id: Option<usize>,
     /// strip_counts[reel][symbol_id] -> occurrences on that reel's strip.
     pub strip_counts: Vec<Vec<u64>>,
+    /// columns[reel][stop] -> visible column for that stop (for exact cap enumeration).
+    pub columns: Vec<Vec<ColumnInfo>>,
+    /// true if reels were specified as weights (realized to strips).
+    pub from_weights: bool,
+}
+
+/// Realize a `{symbol_id: weight}` map into a strip by largest-remainder spreading (even layout,
+/// deterministic). Symbol `s` appears exactly `weight_s` times.
+fn realize_weights(weights: &HashMap<usize, u64>) -> Vec<usize> {
+    let total: u64 = weights.values().copied().sum();
+    let mut syms: Vec<usize> = weights.keys().copied().filter(|s| weights[s] > 0).collect();
+    syms.sort_unstable();
+    let mut placed: HashMap<usize, u64> = syms.iter().map(|&s| (s, 0u64)).collect();
+    let mut strip = Vec::with_capacity(total as usize);
+    for _ in 0..total {
+        let mut best: Option<usize> = None;
+        let mut best_val = f64::INFINITY;
+        for &s in &syms {
+            let w = weights[&s];
+            if placed[&s] < w {
+                let val = (placed[&s] + 1) as f64 / w as f64;
+                if val < best_val - 1e-12 {
+                    best_val = val;
+                    best = Some(s);
+                }
+            }
+        }
+        let s = best.expect("weights must be positive");
+        strip.push(s);
+        *placed.get_mut(&s).unwrap() += 1;
+    }
+    strip
 }
 
 impl Prepared {
@@ -35,12 +78,21 @@ impl Prepared {
         if reels == 0 || reels > MAX_REELS {
             return Err(format!("reels must be 1..={MAX_REELS}, got {reels}"));
         }
-        if cfg.reels.strips.len() != reels {
-            return Err(format!(
-                "reels.strips has {} reels but grid.reels = {reels}",
-                cfg.reels.strips.len()
-            ));
+        if rows == 0 || rows > MAX_ROWS {
+            return Err(format!("rows must be 1..={MAX_ROWS}, got {rows}"));
         }
+
+        // Resolve the reel representation into strips.
+        let (strips, from_weights): (Vec<Vec<usize>>, bool) =
+            match (&cfg.reels.strips, &cfg.reels.weights) {
+                (Some(s), _) => (s.clone(), false),
+                (None, Some(w)) => (w.iter().map(realize_weights).collect(), true),
+                (None, None) => return Err("reels must provide `strips` or `weights`".into()),
+            };
+        if strips.len() != reels {
+            return Err(format!("reels has {} reels but grid.reels = {reels}", strips.len()));
+        }
+
         for (r, line) in cfg.paylines.iter().enumerate() {
             if line.len() != reels {
                 return Err(format!("payline {r} has {} cells, expected {reels}", line.len()));
@@ -82,17 +134,34 @@ impl Prepared {
 
         let mut strip_counts = vec![vec![0u64; n_symbols]; reels];
         let mut strip_len = vec![0u32; reels];
-        for (r, strip) in cfg.reels.strips.iter().enumerate() {
+        let mut columns: Vec<Vec<ColumnInfo>> = Vec::with_capacity(reels);
+        for (r, strip) in strips.iter().enumerate() {
             if strip.is_empty() {
                 return Err(format!("reel {r} strip is empty"));
             }
-            strip_len[r] = strip.len() as u32;
+            let len = strip.len();
+            strip_len[r] = len as u32;
             for &sym in strip {
                 if sym >= n_symbols {
                     return Err(format!("reel {r} references unknown symbol id {sym}"));
                 }
                 strip_counts[r][sym] += 1;
             }
+            // precompute each stop's visible column
+            let mut reel_cols = Vec::with_capacity(len);
+            for stop in 0..len {
+                let mut syms = [0usize; MAX_ROWS];
+                let mut scatters = 0u32;
+                for row in 0..rows {
+                    let sym = strip[(stop + row) % len];
+                    syms[row] = sym;
+                    if is_scatter[sym] {
+                        scatters += 1;
+                    }
+                }
+                reel_cols.push(ColumnInfo { syms, scatters });
+            }
+            columns.push(reel_cols);
         }
 
         let cap_units = {
@@ -111,7 +180,7 @@ impl Prepared {
             cap_units,
             line_eval: cfg.line_eval,
             paylines: cfg.paylines.clone(),
-            strips: cfg.reels.strips.clone(),
+            strips,
             strip_len,
             n_symbols,
             max_count,
@@ -120,6 +189,8 @@ impl Prepared {
             pays,
             scatter_id,
             strip_counts,
+            columns,
+            from_weights,
         })
     }
 
@@ -159,7 +230,6 @@ impl Prepared {
             return 0;
         }
         if self.is_wild[line[0]] {
-            // leading wild can resolve to any paying symbol: take the best.
             let mut best = 0;
             for sym in 0..self.n_symbols {
                 if self.is_scatter[sym] {
@@ -172,7 +242,6 @@ impl Prepared {
             }
             best
         } else {
-            // a run can only start with this exact regular symbol.
             self.run_pay(line[0], line)
         }
     }
@@ -195,7 +264,7 @@ impl Prepared {
         }
     }
 
-    /// Scatter payout for `count` scatters anywhere in the window (count clamped to the table).
+    /// Scatter payout for `count` scatters anywhere in the window (clamped to the table).
     #[inline]
     pub fn scatter_pay(&self, count: usize) -> u64 {
         match self.scatter_id {

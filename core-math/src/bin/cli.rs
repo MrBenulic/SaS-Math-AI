@@ -42,7 +42,9 @@ fn main() {
     let mc_rtp = acc.rtp();
     let ci = acc.rtp_ci95(prep.bet_units);
     let vol = acc.return_variance(prep.bet_units).sqrt();
-    let within = (mc_rtp - exact.rtp).abs() <= ci.max(1e-9);
+    // Monte Carlo is capped; compare it to the exact CAPPED baseline when we have it.
+    let exact_baseline = exact.capped.unwrap_or(exact.rtp);
+    let within = (mc_rtp - exact_baseline).abs() <= ci.max(1e-9);
     let throughput = if secs > 0.0 { spins as f64 / secs / 1e6 } else { 0.0 };
 
     println!("============================================================");
@@ -57,19 +59,27 @@ fn main() {
         cfg.max_win.cap_x
     );
     println!("------------------------------------------------------------");
-    println!(" EXACT RTP (uncapped):  {:>8.4}%", exact.rtp * 100.0);
-    println!(
-        "   - line pays:         {:>8.4}%",
-        exact.line_rtp * 100.0
-    );
-    println!(
-        "   - scatter pays:      {:>8.4}%",
-        exact.scatter_rtp * 100.0
-    );
-    println!(
-        "   - exact ratio:       {} / {}",
-        exact.rtp_ratio.num, exact.rtp_ratio.den
-    );
+    println!(" EXACT RTP (uncapped):  {:>8.4}%   [closed-form]", exact.rtp * 100.0);
+    println!("   - line pays:         {:>8.4}%", exact.line_rtp * 100.0);
+    println!("   - scatter pays:      {:>8.4}%", exact.scatter_rtp * 100.0);
+    match exact.capped {
+        Some(c) => {
+            println!(
+                " CAPPED RTP (cap {}x):  {:>8.4}%   [{}, {} combos]",
+                cfg.max_win.cap_x,
+                c * 100.0,
+                exact.capped_provenance(),
+                exact.combos
+            );
+            println!("   - cap erosion:       {:>8.4}%", (exact.rtp - c) * 100.0);
+        }
+        None => println!(
+            " CAPPED RTP (cap {}x):  numeric tail (enumeration > {} combos) — see MC below [{}]",
+            cfg.max_win.cap_x,
+            sas_math_core::enumerate::ENUM_LIMIT,
+            exact.capped_provenance()
+        ),
+    }
     println!("------------------------------------------------------------");
     println!(" MONTE CARLO  (N = {} spins)", spins);
     println!(

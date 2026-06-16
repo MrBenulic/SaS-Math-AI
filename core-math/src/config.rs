@@ -56,10 +56,16 @@ pub enum SymbolKind {
     Scatter,
 }
 
-/// M1 supports explicit reel strips. (Symbol-weight reels arrive with the solver in M2.)
+/// Reels are given as explicit `strips` OR as per-symbol `weights` (the solver's tuning lever).
+/// Weights are realized into a deterministic spread strip at prepare-time (ADR-006), so the exact
+/// enumerator and Monte Carlo consume both representations through one code path.
 #[derive(Debug, Clone, Deserialize)]
 pub struct Reels {
-    pub strips: Vec<Vec<usize>>,
+    #[serde(default)]
+    pub strips: Option<Vec<Vec<usize>>>,
+    /// One `{symbol_id: weight}` map per reel.
+    #[serde(default)]
+    pub weights: Option<Vec<HashMap<usize, u64>>>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
