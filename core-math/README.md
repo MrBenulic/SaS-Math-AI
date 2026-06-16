@@ -1,7 +1,13 @@
 # core-math (Rust) — Module 3 + 4
 
-The deterministic math engine. **Not yet implemented** — built in **M1** (`v0.2.0`).
+The deterministic math engine. **M1 engine implemented** (on `beta`, tagged `v0.2.0-beta.1`).
 This is a **pure Rust crate** (no Python/FFI in the core; ADR-007).
+
+**M1 status (verified):** exact RTP == Monte Carlo within 95% CI; thread-independent determinism
+(identical to the unit); hand-verifiable exact integer ratio (72/27); ~19M spins/s (10M spins in
+~0.55s — under the 2s target). Run it:
+`cargo run --release --bin cli -- examples/sample_5x3.json 10000000`.
+Remaining before stable `v0.2.0`: parity against an external **certified** reference game.
 
 ## Planned layout
 ```

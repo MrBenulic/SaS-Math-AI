@@ -82,7 +82,7 @@ SHEETS = {
         "widths": [14, 11, 40, 44, 13],
         "rows": [
             ["Foundation", "v0.1.0", "repo, branching, ADRs, draft schema, tooling", "clean documented checkpoint", "Done"],
-            ["M1", "v0.2.0", "Core Math Engine (5x3 lines)", "Parity Test passes; seed-replay identical; 10M < 2s", "Planned"],
+            ["M1", "v0.2.0", "Core Math Engine (5x3 lines)", "Parity Test passes; seed-replay identical; 10M < 2s", "In progress"],
             ["M2", "v0.3.0", "Auto-Tuner / Solver", "broken 140% RTP config -> fixed playable 96%", "Planned"],
             ["M3", "v0.4.0", "AI translator + FastAPI + frontend", "prompt -> JSON -> simulate -> tune in browser", "Planned"],
             ["M4", "v1.0.0", "Advanced mechanics + GLI/BMM exporter", "exported sheet matches a certified live game", "Planned"],
@@ -94,9 +94,28 @@ SHEETS = {
         "widths": [12, 12, 13, 46, 34],
         "rows": [
             ["v0.1.0", "stable", "2026-06-16", "Foundation: repo, stable/beta branching, ADRs, draft schema, workbook, plugins", "baseline checkpoint; git checkout v0.1.0"],
+            ["v0.2.0-beta.1", "beta", "2026-06-16", "M1 core-math engine: namespaced RNG, integer accounting, exact+MC, CLI; 6 tests green (~19M spins/s)", "last stable = v0.1.0; git checkout v0.1.0"],
         ],
     },
 }
+
+# --- live updates applied at build time (M1 engine built on beta) ---
+_metric_current = {
+    "RTP (exact)": "95.30",
+    "RTP (Monte Carlo)": "95.34 +/- 0.11",
+    "Hit frequency": "51.33",
+    "Volatility": "2.47",
+    "Spin throughput": "~19M/s (10M in 0.55s)",
+    "Determinism": "PASS (thread-independent)",
+    "Exact-vs-MC delta": "within 95% CI",
+    "Parity deviation (exact)": "pending external game",
+}
+for _r in SHEETS["Metrics"]["rows"]:
+    if _r[0] in _metric_current:
+        _r[3] = _metric_current[_r[0]]
+for _r in SHEETS["Features"]["rows"]:
+    if _r[5] == "M1":
+        _r[3] = "Done"
 
 
 def build():

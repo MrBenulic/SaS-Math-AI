@@ -9,7 +9,7 @@ secrets/
 # ---- Rust (core-math, solver) ----
 target/
 **/*.rs.bk
-Cargo.lock        # keep for binaries; remove this line if we ship only libraries
+# Cargo.lock is committed (this crate ships a binary).
 
 # ---- Python (ai-layer, solver proto) ----
 __pycache__/
