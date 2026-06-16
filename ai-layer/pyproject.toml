@@ -1,0 +1,16 @@
+[project]
+name = "sas-math-ai-layer"
+version = "0.4.0"
+description = "SaS-Math AI — AI Context Translator + orchestration (M3)"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi",
+    "uvicorn[standard]",
+    "pydantic>=2",
+]
+
+[project.optional-dependencies]
+dev = ["httpx", "pytest"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

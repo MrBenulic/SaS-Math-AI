@@ -96,8 +96,10 @@ impl Prepared {
             if e.symbol_id >= n_symbols {
                 return Err(format!("paytable references unknown symbol_id {}", e.symbol_id));
             }
-            for (&count, &payout) in &e.pays {
-                let c = count as usize;
+            for (count_str, &payout) in &e.pays {
+                let c: usize = count_str
+                    .parse()
+                    .map_err(|_| format!("paytable count key '{count_str}' is not an integer"))?;
                 if c <= max_count {
                     pays[e.symbol_id][c] = payout;
                 }
@@ -156,17 +158,26 @@ impl Prepared {
                 wsyms = vec![Vec::new(); reels];
                 wcum = vec![Vec::new(); reels];
                 for (r, wmap) in w.iter().enumerate() {
-                    let mut ids: Vec<usize> = wmap.keys().copied().filter(|s| wmap[s] > 0).collect();
-                    ids.sort_unstable();
-                    if ids.is_empty() {
-                        return Err(format!("reel {r} has no positive weights"));
-                    }
-                    let mut cum = 0u64;
-                    for &sym in &ids {
+                    // parse string keys -> (symbol_id, weight), positive only, sorted by id
+                    let mut pairs: Vec<(usize, u64)> = Vec::new();
+                    for (k, &wv) in wmap {
+                        if wv == 0 {
+                            continue;
+                        }
+                        let sym: usize = k
+                            .parse()
+                            .map_err(|_| format!("reel {r} weight key '{k}' is not an integer"))?;
                         if sym >= n_symbols {
                             return Err(format!("reel {r} references unknown symbol id {sym}"));
                         }
-                        let wv = wmap[&sym];
+                        pairs.push((sym, wv));
+                    }
+                    if pairs.is_empty() {
+                        return Err(format!("reel {r} has no positive weights"));
+                    }
+                    pairs.sort_by_key(|&(s, _)| s);
+                    let mut cum = 0u64;
+                    for (sym, wv) in pairs {
                         sym_count[r][sym] = wv;
                         cum += wv;
                         wsyms[r].push(sym);

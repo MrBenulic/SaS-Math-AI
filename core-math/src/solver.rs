@@ -360,7 +360,8 @@ fn finalize(
 // ---------- realize + re-verify (ADR-006) ----------
 
 /// Convert tuned float weights into integer per-reel weight maps (~`scale_target` total per reel).
-pub fn weights_to_integer(weights: &[Vec<f64>], scale_target: f64) -> Vec<HashMap<usize, u64>> {
+/// Keys are stringified symbol ids (matches `config::Reels::weights`).
+pub fn weights_to_integer(weights: &[Vec<f64>], scale_target: f64) -> Vec<HashMap<String, u64>> {
     weights
         .iter()
         .map(|wr| {
@@ -370,7 +371,7 @@ pub fn weights_to_integer(weights: &[Vec<f64>], scale_target: f64) -> Vec<HashMa
                 for (s, &wv) in wr.iter().enumerate() {
                     if wv > 0.0 {
                         let v = (wv / total * scale_target).round().max(1.0) as u64;
-                        m.insert(s, v);
+                        m.insert(s.to_string(), v);
                     }
                 }
             }

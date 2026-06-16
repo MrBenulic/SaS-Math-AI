@@ -13,12 +13,12 @@ deterministic **exact + Monte Carlo** math engine → auto-tuning solver → GLI
 
 ## 2. Current status
 - **Date:** 2026-06-16
-- **Version / milestone:** `v0.3.0-beta.2` — **M2 Auto-Tuner/Solver** on `beta`, now **scatter-consistent + multi-objective** (tunes RTP + volatility + hit-frequency). Weighted reels use the independent-cell model so the solver objective and re-verify agree. M1 engine complete. Stable promotion still pending external certified-game parity.
+- **Version / milestone:** `v0.4.0-beta.1` — **M3 AI layer** on `beta`: FastAPI orchestration + a provider-agnostic AI Context Translator (rule-based, no API key) + a Rust JSON engine bridge. The full **prompt → JSON → simulate → tune** pipeline runs. (Next.js frontend = next slice.) M1 + M2 complete.
 - **Branch:** `beta` (active work). `main` holds stable `v0.1.0`.
-- **Latest stable tag:** `v0.1.0` · **Latest beta tag:** `v0.3.0-beta.2`
+- **Latest stable tag:** `v0.1.0` · **Latest beta tag:** `v0.4.0-beta.1`
 - **Repo (private):** [`MrBenulic/SaS-Math-AI`](https://github.com/MrBenulic/SaS-Math-AI)
 - **Local path:** `~/Desktop/SaS-Math AI app`
-- **Verified (16 tests green):** M1 exact+capped+determinism; M2 — gate PASS (139%→96%); **scatter game now re-verifies** with <1% delta (was 5.8%); weighted exact scatter == MC; **multi-objective** hits RTP + a chosen volatility (4.0 and 2.0 both achieved at ~96% RTP, hit-freq trading off). Demos: `cd core-math && cargo run --release --bin tune -- examples/broken_143.json 0.96 250` (scatter); `... examples/broken_lineonly.json 0.96 150 3.0` (RTP+vol).
+- **Verified (16 Rust + 6 Python tests green):** M1+M2 engine/solver; **M3 gate** — prompt "5x3, 20 lines, 96% RTP, medium vol, wild+scatter" → translate → simulate (149%) → tune → **96.00%** (realize-delta 0.0001), all via the AI layer calling the Rust engine. Run: `cd ai-layer && .venv/bin/python -m pytest -q`; or `.venv/bin/uvicorn app.main:app` then `POST /design`.
 
 ## 3. How to resume
 ```bash
@@ -52,7 +52,12 @@ git checkout beta                             # do new work on beta, never direc
   via CRN Monte Carlo). Weighted reels are **independent-cell** so the solver objective == re-verify
   (scatter games re-verify with <1% delta). Gate PASS. **Remaining:** full CMA-ES covariance; PyO3
   bindings; `ways_243`/buy-feature mechanics; (stable promotion needs external certified-game parity).
-- ⏳ v0.4.0 M3 AI+frontend · v1.0.0 M4 advanced mechanics + GLI/BMM exporter.
+- 🟦 **v0.4.0 M3 — AI + frontend** (in progress on `beta`, tag `v0.4.0-beta.1`): FastAPI `ai-layer`
+  with a provider-agnostic AI Context Translator (rule-based default; LLM adapter stub), Pydantic
+  models, the fixed mechanics library, and a Rust JSON engine bridge (`core-math/src/bin/engine.rs`).
+  prompt→JSON→simulate→tune pipeline green (6 Python tests). **Remaining:** Next.js + Tailwind +
+  Zustand + Monaco UI; schema→TS codegen; Playwright E2E; Postgres/SQLite persistence; real LLM wiring.
+- ⏳ v1.0.0 M4 advanced mechanics + GLI/BMM exporter.
 
 ## 6. Open decisions / TODO
 - **LLM provider** for Module 2 — *deferred* (decide in M3). Code a provider-agnostic interface.
@@ -114,6 +119,16 @@ git checkout beta                             # do new work on beta, never direc
   CLI takes `[target_vol] [target_hit]`. Demo: vol 4.0→4.029 (hit-freq 29%) and 2.0→1.970 (36%) at
   ~96% RTP. 16 tests green. Tagged `v0.3.0-beta.2`. **Next:** full CMA-ES covariance, PyO3; or M3
   (AI + frontend). Stable needs external certified-game parity.
+- **2026-06-16 (M3 beta.1)** — AI layer backend. `core-math/src/bin/engine.rs`: JSON bridge
+  (stdin/stdout) so Python drives the engine/solver without PyO3 — `simulate`/`tune` commands. Also
+  changed `pays`/`weights` map keys to `String` (internally-tagged serde enums buffer content and
+  break integer map keys). `ai-layer/` (FastAPI + Pydantic 2): `models.py` (schema mirror),
+  `mechanics.py` (fixed library + base-config builder), `translator.py` (`RuleBasedTranslator` +
+  provider stub, ADR-008), `engine.py` (subprocess bridge), `main.py` (`/translate /validate
+  /simulate /tune /design /health`). 6 pytest green. **Gate:** `POST /design` runs prompt→JSON→
+  simulate→tune; demo "5x3, 20 lines, 96% RTP, medium vol, wild+scatter" → 1.49 → **0.9600** RTP,
+  realize-delta 0.0001. Tagged `v0.4.0-beta.1`. **Next M3:** Next.js/Tailwind/Zustand/Monaco UI;
+  schema→TS codegen; Playwright; persistence; real LLM provider.
 
 ---
 
@@ -126,10 +141,11 @@ Local path: ~/Desktop/SaS-Math AI app  (private GitHub repo MrBenulic/SaS-Math-A
 FIRST: read reboot.md, CLAUDE.md, and docs/design-decisions.md in that folder — they hold the live
 status and the locked engineering decisions (ADRs). Then read docs/roadmap.md for what's next.
 
-Current state: M1 engine + M2 solver are BUILT on `beta` (tag v0.3.0-beta.2): exact closed-form +
-capped enumeration, weight-reels (independent-cell), deterministic Monte Carlo, and a multi-objective
-ES auto-tuner that hits target RTP + volatility + hit-frequency and re-verifies against the integer
-engine. 16 tests green. Gate PASS (139%→96%); scatter games re-verify with <1% delta. v0.1.0
+Current state: M1 engine + M2 solver + M3 ai-layer (backend) are BUILT on `beta` (tag v0.4.0-beta.1).
+Rust core: exact closed-form + capped enumeration, independent-cell weight-reels, deterministic MC,
+and a multi-objective ES auto-tuner (RTP + volatility + hit-frequency). M3: a FastAPI ai-layer with a
+provider-agnostic AI Context Translator (rule-based default) calling the Rust engine via a JSON bridge
+(`bin/engine.rs`) — full prompt→JSON→simulate→tune pipeline. 16 Rust + 6 Python tests green. v0.1.0
 Foundation is on `main`. We work on `beta` and promote to `main` (tag vX.Y.Z) only after a milestone
 gate passes; we cut beta pre-releases as vX.Y.Z-beta.N. Always tag a stable point before risky changes.
 
@@ -138,9 +154,11 @@ Non-negotiables (see CLAUDE.md / ADRs): integer/u128 money accounting; counter-b
 exact combinatorial math is the certification source of truth and MC only validates the harness +
 non-enumerable features; max-win cap is modeled inside the math; the LLM never writes code.
 
-Next options: M2 polish — full CMA-ES covariance adaptation and PyO3 bindings (Python access to the
-engine/solver); OR start M3 — AI Context Translator (NL -> validated JSON, provider-agnostic) +
-FastAPI orchestration + Next.js config UI. (Scatter consistency + multi-objective vol/hit are DONE.)
-Stable promotion still needs external CERTIFIED-game parity. See docs/roadmap.md, core-math/README.md;
-run `cargo test --release` in core-math/. Do work on `beta`; keep reboot.md + the Excel tracker current.
+Next: M3 frontend — Next.js + Tailwind + Zustand + Monaco config UI talking to the FastAPI ai-layer
+(schema→TS codegen, Playwright E2E, Postgres/SQLite persistence); optionally wire a real LLM provider
+into the translator stub. Other open items: M2 polish (full CMA-ES covariance, PyO3); stable promotion
+needs external CERTIFIED-game parity. To run the ai-layer: `cd ai-layer && python3 -m venv .venv &&
+.venv/bin/pip install -e '.[dev]'`, build `core-math` engine (`cargo build --release --bin engine`),
+then `.venv/bin/python -m pytest -q` or `.venv/bin/uvicorn app.main:app`. Do work on `beta`; keep
+reboot.md + the Excel tracker current.
 ```

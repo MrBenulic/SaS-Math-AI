@@ -63,16 +63,17 @@ pub enum SymbolKind {
 pub struct Reels {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub strips: Option<Vec<Vec<usize>>>,
-    /// One `{symbol_id: weight}` map per reel.
+    /// One `{symbol_id: weight}` map per reel (symbol id as a string key; parsed in `Prepared::new`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub weights: Option<Vec<HashMap<usize, u64>>>,
+    pub weights: Option<Vec<HashMap<String, u64>>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PaytableEntry {
     pub symbol_id: usize,
-    /// match-count -> payout in integer smallest-units (JSON string keys parsed to u32).
-    pub pays: HashMap<u32, u64>,
+    /// match-count (as a string key, e.g. "3") -> payout in integer smallest-units. Parsed to an
+    /// integer in `Prepared::new`. String keys keep JSON round-trips robust (incl. tagged requests).
+    pub pays: HashMap<String, u64>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
