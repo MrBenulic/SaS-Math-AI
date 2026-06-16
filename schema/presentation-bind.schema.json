@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sas-math.ai/schema/presentation-bind-0.1.json",
+  "title": "SaS-Math AI Presentation Binding",
+  "description": "DRAFT v0.1 — the art↔math bridge. Maps a game-config's stable integer symbol ids and the engine's closed set of event types to concrete art assets (Spine skeletons, atlas regions, spritesheet frames, sounds). PRESENTATION ONLY — kept entirely outside the certified-math core so the cert artifact stays pure (ADR-001). A binding is valid only if it is bidirectionally complete: every symbol id and every event type is bound, and nothing references an id/event that does not exist. Single source of truth for the Pydantic + TS binding types (ADR-004).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["bind_version", "symbols", "events"],
+  "properties": {
+    "bind_version": { "type": "string", "const": "0.1.0" },
+    "targets_config_hash": {
+      "description": "Optional content-hash (e.g. BLAKE3) of the math config this binding targets. Lets a build prove art and math are paired. Filled once configs are content-addressed.",
+      "type": "string"
+    },
+    "symbols": {
+      "description": "One binding per game-config symbol id. Every symbol id MUST appear here, and each must resolve to at least one renderable asset (skeleton, atlas_region, or spritesheet).",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["symbol_id"],
+        "properties": {
+          "symbol_id": { "type": "integer", "minimum": 0 },
+          "skeleton": { "type": "string", "description": "Spine skeleton file (.json/.skel)." },
+          "atlas": { "type": "string", "description": "Spine atlas file." },
+          "default_skin": { "type": "string" },
+          "idle_anim": { "type": "string" },
+          "land_anim": { "type": "string", "description": "Animation when this symbol lands on the reels." },
+          "win_anim": { "type": "string", "description": "Animation when this symbol is part of a win." },
+          "atlas_region": { "type": "string", "description": "Static atlas region (for non-Spine symbols)." },
+          "spritesheet": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["sheet"],
+            "properties": {
+              "sheet": { "type": "string" },
+              "frames": { "type": "array", "items": { "type": "string" } },
+              "fps": { "type": "integer", "minimum": 1, "default": 30 }
+            }
+          },
+          "sound_cue": { "type": "string" }
+        }
+      }
+    },
+    "events": {
+      "description": "One binding per engine event type. Every event in the closed event-type set MUST be bound. The set mirrors the engine's RoundOutcome (line_win/scatter_win/cap_applied) plus the spin lifecycle.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["event_type"],
+        "properties": {
+          "event_type": {
+            "type": "string",
+            "enum": ["spin_start", "reels_settled", "line_win", "scatter_win", "cap_applied", "spin_end"]
+          },
+          "anim": { "type": "string" },
+          "target": { "type": "string", "description": "Skeleton/layer the animation plays on." },
+          "sound": { "type": "string" },
+          "blocking": { "type": "boolean", "default": false, "description": "Does the play sequence wait for this animation to finish?" },
+          "min_duration_ms": { "type": "integer", "minimum": 0, "default": 0 }
+        }
+      }
+    }
+  }
+}

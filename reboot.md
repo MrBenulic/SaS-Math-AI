@@ -153,6 +153,16 @@ git checkout beta                             # do new work on beta, never direc
   **UNCOMMITTED on `beta`** (rollback point is tag `v0.4.0-beta.2`); next: commit + tag a beta
   snapshot. **Next build:** finish rank 2/3 (exact `ways_243` + golden-vector CI gate), then the
   `presentation.bind.json` art-binding sidecar (rank 4), then the content-hashed published artifact.
+- **2026-06-16 (committed + art-binding sidecar)** — Committed/tagged the above as `v0.4.0-beta.3`
+  (pushed). Then built the **art-binding sidecar** (roadmap rank 4, the wedge): `schema/presentation-
+  bind.schema.json` (the art↔math contract — symbol id + closed event-type enum → Spine skeleton /
+  atlas region / spritesheet frames / sound; PRESENTATION ONLY, kept out of core-math so the cert
+  artifact stays pure), `ai-layer/app/binding.py` (Pydantic models + `EVENT_TYPES` mirroring the
+  engine RoundOutcome + `validate_binding` bidirectional-completeness check), and endpoints
+  `POST /validate-bind` + `GET /bind/event-types` in `main.py`. **12 Python tests green** (was 6;
+  +6 in `tests/test_binding.py`). To be tagged `v0.4.0-beta.4`. **Next build:** wire a "load my Spine
+  files → validate binding" step into the Slot Studio UI (so the studio sees green/red coverage), the
+  content-hashed published-math artifact (rank 5), and finish exact `ways_243` (rank 2 remainder).
 
 ---
 

@@ -12,6 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, ValidationError
 
 from . import engine as eng
+from .binding import EVENT_TYPES, PresentationBind, validate_binding
 from .mechanics import VOLATILITY_PRESETS
 from .models import GameConfig
 from .translator import get_translator
@@ -49,9 +50,26 @@ class DesignReq(BaseModel):
     generations: int = 150
 
 
+class BindValidateReq(BaseModel):
+    config: GameConfig
+    binding: PresentationBind
+
+
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@app.get("/bind/event-types")
+def bind_event_types() -> dict[str, Any]:
+    """The closed set of engine event types a presentation binding must cover (the art↔math contract)."""
+    return {"event_types": list(EVENT_TYPES)}
+
+
+@app.post("/validate-bind")
+def validate_bind(r: BindValidateReq) -> dict[str, Any]:
+    """Bidirectional completeness check: every symbol + every event type is bound to art (the wedge)."""
+    return validate_binding(r.config, r.binding).model_dump()
 
 
 @app.post("/translate")
