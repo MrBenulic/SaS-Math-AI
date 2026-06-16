@@ -29,6 +29,17 @@ pub struct ColumnInfo {
     pub scatters: u32,
 }
 
+/// One winning run on a payline, for the traced/replay outcome stream (money in integer units).
+/// The pays of all `line_wins` on a line sum to that line's `line_pay`.
+#[derive(Debug, Clone, Copy)]
+pub struct LineWinDetail {
+    pub symbol: usize,
+    pub count: usize,
+    /// `false` = left-to-right anchor; `true` = right-to-left anchor (the `both_ways` reverse pass).
+    pub reversed: bool,
+    pub pay: u64,
+}
+
 pub struct Prepared {
     pub reels: usize,
     pub rows: usize,
@@ -72,6 +83,16 @@ impl Prepared {
         }
         if rows == 0 || rows > MAX_ROWS {
             return Err(format!("rows must be 1..={MAX_ROWS}, got {rows}"));
+        }
+        // `ways_243` line pays are not implemented yet. Reject loudly rather than silently paying
+        // zero — a wrong-but-plausible RTP must never reach a config (line_eval is the #1 place
+        // parity fails). Re-enable once exact all-ways math + a certified parity sheet exist.
+        if cfg.line_eval == LineEval::Ways243 {
+            return Err(
+                "line_eval 'ways_243' is not yet implemented (it would silently pay zero); \
+                 use 'left_to_right' or 'both_ways'"
+                    .into(),
+            );
         }
 
         let n_symbols = cfg.symbols.iter().map(|s| s.id).max().map(|m| m + 1).unwrap_or(0);
@@ -261,52 +282,96 @@ impl Prepared {
         run
     }
 
+    /// The single left-anchored winning run on `line`: `(symbol, run length, pay)`; `(0, 0, 0)` if
+    /// the line cannot pay left-to-right. A wild leader picks the best-paying non-scatter symbol.
     #[inline]
-    fn run_pay(&self, sym: usize, line: &[usize]) -> u64 {
-        let r = self.run_len(sym, line);
-        if r >= 1 && r <= self.max_count {
-            self.pays[sym][r]
-        } else {
-            0
-        }
-    }
-
-    fn line_pay_ltr(&self, line: &[usize]) -> u64 {
+    fn ltr_run(&self, line: &[usize]) -> (usize, usize, u64) {
         if line.is_empty() || self.is_scatter[line[0]] {
-            return 0;
+            return (0, 0, 0);
         }
+        let pay_of = |sym: usize, c: usize| -> u64 {
+            if c >= 1 && c <= self.max_count {
+                self.pays[sym][c]
+            } else {
+                0
+            }
+        };
         if self.is_wild[line[0]] {
-            let mut best = 0;
+            let mut best = (0usize, 0usize, 0u64);
             for sym in 0..self.n_symbols {
                 if self.is_scatter[sym] {
                     continue;
                 }
-                let p = self.run_pay(sym, line);
-                if p > best {
-                    best = p;
+                let c = self.run_len(sym, line);
+                let p = pay_of(sym, c);
+                if p > best.2 {
+                    best = (sym, c, p);
                 }
             }
             best
         } else {
-            self.run_pay(line[0], line)
+            let s = line[0];
+            let c = self.run_len(s, line);
+            (s, c, pay_of(s, c))
         }
+    }
+
+    #[inline]
+    fn reversed<'a>(line: &[usize], buf: &'a mut [usize; MAX_REELS]) -> &'a [usize] {
+        let n = line.len();
+        for i in 0..n {
+            buf[i] = line[n - 1 - i];
+        }
+        &buf[..n]
     }
 
     #[inline]
     pub fn line_pay(&self, line: &[usize]) -> u64 {
         match self.line_eval {
-            LineEval::LeftToRight => self.line_pay_ltr(line),
+            LineEval::LeftToRight => self.ltr_run(line).2,
             LineEval::BothWays => {
-                let l = self.line_pay_ltr(line);
-                let mut rev: [usize; MAX_REELS] = [0; MAX_REELS];
-                let n = line.len();
-                for i in 0..n {
-                    rev[i] = line[n - 1 - i];
+                let (_, count, pay) = self.ltr_run(line);
+                // A run that spans the whole line is the SAME combination from either end — count
+                // it once, not once per direction (the old code double-paid full-line wins).
+                if count == line.len() {
+                    pay
+                } else {
+                    let mut buf = [0usize; MAX_REELS];
+                    pay + self.ltr_run(Self::reversed(line, &mut buf)).2
                 }
-                l + self.line_pay_ltr(&rev[..n])
             }
-            LineEval::Ways243 => 0,
+            LineEval::Ways243 => 0, // unreachable: rejected in `Prepared::new`
         }
+    }
+
+    /// The winning runs on `line` (for the traced/replay outcome stream). Their pays sum to
+    /// [`Self::line_pay`] for the same line.
+    pub fn line_wins(&self, line: &[usize]) -> Vec<LineWinDetail> {
+        let mut out = Vec::new();
+        match self.line_eval {
+            LineEval::LeftToRight => {
+                let (symbol, count, pay) = self.ltr_run(line);
+                if pay > 0 {
+                    out.push(LineWinDetail { symbol, count, reversed: false, pay });
+                }
+            }
+            LineEval::BothWays => {
+                let (symbol, count, pay) = self.ltr_run(line);
+                if pay > 0 {
+                    out.push(LineWinDetail { symbol, count, reversed: false, pay });
+                }
+                // Skip the reverse pass for a full-line win (same combination both ways).
+                if count != line.len() {
+                    let mut buf = [0usize; MAX_REELS];
+                    let (rsym, rcount, rpay) = self.ltr_run(Self::reversed(line, &mut buf));
+                    if rpay > 0 {
+                        out.push(LineWinDetail { symbol: rsym, count: rcount, reversed: true, pay: rpay });
+                    }
+                }
+            }
+            LineEval::Ways243 => {} // unreachable: rejected in `Prepared::new`
+        }
+        out
     }
 
     #[inline]

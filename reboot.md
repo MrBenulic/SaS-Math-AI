@@ -137,6 +137,22 @@ git checkout beta                             # do new work on beta, never direc
   `v0.4.0-beta.2`. **Next:** schema→TS codegen, Playwright E2E, persistence, real LLM provider; then
   M4. To run the UI: `.claude/launch.json` `sas-frontend`, or `cd frontend && npm run dev` (needs
   ai-layer uvicorn + core-math engine).
+- **2026-06-16 (strategy + event-stream wedge)** — Studied the open-source incumbent
+  **StakeEngine/math-sdk** (sim-first, Stake-RGS-coupled, MIT) and reframed strategy around the
+  **animation-studio wedge** (art + certified math = one package) and the GLI/BMM whitespace; wrote
+  `docs/product-strategy.md` (competitive landscape + prioritized "on-steroids" roadmap + clean-room
+  guardrail: learn ideas only, NEVER launder OSS). Built the **deterministic event stream** — the
+  art↔math bridge (roadmap rank 1): `core-math/src/outcome.rs` (`RoundOutcome`/`LineWin`/`ScatterWin`,
+  `simulate_one_traced`), shared `fill_grid` so the MC hot path stays allocation-free and provably
+  equals the trace, and a `{"command":"replay","spin_index":N}` variant on `bin/engine.rs` (emits the
+  integer event stream a frontend can replay to drive Spine/atlas animations). Also fixed two
+  line-eval correctness traps: `ways_243` now **fails loud** (was a silent zero-pay), `both_ways` no
+  longer **double-pays a full-line** win (shared no-alloc `ltr_run`; new `line_wins` detail).
+  **22 Rust tests green** (was 16; +6 in `tests/outcome.rs`: scalar==traced over 400k spins,
+  deterministic/byte-stable replay, outcome invariants, both_ways full-line-once, ways_243 rejected).
+  **UNCOMMITTED on `beta`** (rollback point is tag `v0.4.0-beta.2`); next: commit + tag a beta
+  snapshot. **Next build:** finish rank 2/3 (exact `ways_243` + golden-vector CI gate), then the
+  `presentation.bind.json` art-binding sidecar (rank 4), then the content-hashed published artifact.
 
 ---
 

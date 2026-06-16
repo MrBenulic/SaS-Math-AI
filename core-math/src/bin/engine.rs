@@ -10,6 +10,7 @@
 use sas_math_core::config::GameConfig;
 use sas_math_core::enumerate::exact_rtp;
 use sas_math_core::mechanics::Prepared;
+use sas_math_core::outcome::simulate_one_traced;
 use sas_math_core::simulate::monte_carlo;
 use sas_math_core::solver::{realized_config, solve, solve_multi, SolveOptions, SolveTargets};
 use serde::{Deserialize, Serialize};
@@ -33,6 +34,13 @@ enum Request {
         target_volatility: Option<f64>,
         #[serde(default)]
         target_hit_frequency: Option<f64>,
+    },
+    /// Replay one exact spin as a deterministic outcome/event stream (the art↔math bridge).
+    Replay {
+        config: GameConfig,
+        spin_index: u64,
+        #[serde(default)]
+        seed: Option<u64>,
     },
 }
 
@@ -160,6 +168,15 @@ fn main() {
                 evaluations: res.evaluations,
             };
             println!("{}", serde_json::to_string(&resp).unwrap());
+        }
+        Request::Replay { config, spin_index, seed } => {
+            let prep = match Prepared::new(&config) {
+                Ok(p) => p,
+                Err(e) => fail(format!("invalid config: {e}")),
+            };
+            let seed = seed.unwrap_or(config.rng.master_seed);
+            let outcome = simulate_one_traced(&prep, seed, spin_index);
+            println!("{}", serde_json::to_string(&outcome).unwrap());
         }
     }
 }

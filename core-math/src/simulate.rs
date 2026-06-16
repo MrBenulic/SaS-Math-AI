@@ -16,22 +16,29 @@ pub struct McResult {
     pub spins: u64,
 }
 
-/// One spin's total win in integer units (capped). Pure function of `(master_seed, spin_index)`.
+/// Build the visible `grid[reel][row]` for one spin from a spin-seeded RNG, returning the physical
+/// reel stops (Strips model) and whether they are meaningful. Shared by the fast scalar path
+/// ([`simulate_one`]) and the traced/replay path ([`crate::outcome::simulate_one_traced`]) so the two
+/// consume the RNG in the identical order and can never produce different grids.
 #[inline]
-pub fn simulate_one(prep: &Prepared, master_seed: u64, spin_index: u64) -> u64 {
-    let mut rng = NamespacedRng::for_spin(master_seed, NS_BASE_REELS, spin_index);
-
-    // build the visible grid[reel][row]
-    let mut grid = [[0usize; MAX_ROWS]; MAX_REELS];
+pub(crate) fn fill_grid(
+    prep: &Prepared,
+    rng: &mut NamespacedRng,
+    grid: &mut [[usize; MAX_ROWS]; MAX_REELS],
+) -> ([u32; MAX_REELS], bool) {
+    let mut stops = [0u32; MAX_REELS];
     match prep.model {
         ReelModel::Strips => {
             for r in 0..prep.reels {
                 let len = prep.reel_size[r] as usize;
-                let stop = rng.below(prep.reel_size[r] as u32) as usize;
+                let stop = rng.below(prep.reel_size[r] as u32);
+                stops[r] = stop;
+                let stop = stop as usize;
                 for row in 0..prep.rows {
                     grid[r][row] = prep.strips[r][(stop + row) % len];
                 }
             }
+            (stops, true)
         }
         ReelModel::Weights => {
             for r in 0..prep.reels {
@@ -41,8 +48,17 @@ pub fn simulate_one(prep: &Prepared, master_seed: u64, spin_index: u64) -> u64 {
                     grid[r][row] = prep.sample_weighted(r, x);
                 }
             }
+            (stops, false)
         }
     }
+}
+
+/// One spin's total win in integer units (capped). Pure function of `(master_seed, spin_index)`.
+#[inline]
+pub fn simulate_one(prep: &Prepared, master_seed: u64, spin_index: u64) -> u64 {
+    let mut rng = NamespacedRng::for_spin(master_seed, NS_BASE_REELS, spin_index);
+    let mut grid = [[0usize; MAX_ROWS]; MAX_REELS];
+    fill_grid(prep, &mut rng, &mut grid);
 
     let mut total: u64 = 0;
     let mut line_syms = [0usize; MAX_REELS];

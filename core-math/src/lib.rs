@@ -10,6 +10,7 @@ pub mod accounting;
 pub mod config;
 pub mod enumerate;
 pub mod mechanics;
+pub mod outcome;
 pub mod rng;
 pub mod simulate;
 pub mod solver;
@@ -17,6 +18,7 @@ pub mod stats;
 
 pub use config::GameConfig;
 pub use enumerate::{exact_rtp, ExactResult};
+pub use outcome::{simulate_one_traced, LineWin, RoundOutcome, ScatterWin, WinDirection};
 pub use simulate::{monte_carlo, McResult};
 pub use solver::{solve, solve_multi, SolveOptions, SolveResult, SolveTargets};
 pub use stats::Accumulator;
