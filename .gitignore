@@ -1,0 +1,45 @@
+# ---- Secrets / environment ----
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets/
+
+# ---- Rust (core-math, solver) ----
+target/
+**/*.rs.bk
+Cargo.lock        # keep for binaries; remove this line if we ship only libraries
+
+# ---- Python (ai-layer, solver proto) ----
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+
+# ---- Node / Next.js (frontend) ----
+node_modules/
+.next/
+out/
+dist/
+.turbo/
+npm-debug.log*
+yarn-error.log*
+
+# ---- Simulation / build artifacts ----
+*.profraw
+flamegraph.svg
+/sim-output/
+/artifacts/
+
+# ---- OS / editor ----
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.swp
