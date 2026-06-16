@@ -163,6 +163,18 @@ git checkout beta                             # do new work on beta, never direc
   +6 in `tests/test_binding.py`). To be tagged `v0.4.0-beta.4`. **Next build:** wire a "load my Spine
   files → validate binding" step into the Slot Studio UI (so the studio sees green/red coverage), the
   content-hashed published-math artifact (rank 5), and finish exact `ways_243` (rank 2 remainder).
+- **2026-06-16 (cert fingerprint + golden vector)** — Two parked inputs (user-confirmed): a real LLM
+  provider is deferred; a certified math/PAR sheet is expected ~late June 2026 — so we build
+  everything NOT blocked on those. Built the **published-math artifact + config fingerprint** (rank 5,
+  Python stdlib, no new deps): `ai-layer/app/artifact.py` (`canonical_config_bytes` →
+  **SHA-256** `config_hash` → `build_published_artifact`), endpoints `POST /publish` + `POST
+  /config-hash`; tied into the binding (`validate_binding` now verifies an optional
+  `targets_config_hash`). Added a **golden replay vector** (rank 3): `tests/outcome.rs`
+  `golden_replay_sample_5x3_spin1` pins an exact RoundOutcome so any seed-perturbing code change is
+  caught (ADR-003). **23 Rust + 18 Python tests green** (+1 Rust golden, +4 artifact, +2 binding-hash).
+  To be tagged `v0.4.0-beta.5`. **Next (no LLM/cert needed):** Studio UI to drop in Spine files and see
+  binding coverage; expose the engine's exact integer rational into the artifact; `index.json` ledger;
+  typed `NoFeasibleSolution`; then exact `ways_243` with hand-verified tests.
 
 ---
 

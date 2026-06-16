@@ -12,6 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, ValidationError
 
 from . import engine as eng
+from .artifact import build_published_artifact, config_hash
 from .binding import EVENT_TYPES, PresentationBind, validate_binding
 from .mechanics import VOLATILITY_PRESETS
 from .models import GameConfig
@@ -55,6 +56,11 @@ class BindValidateReq(BaseModel):
     binding: PresentationBind
 
 
+class PublishReq(BaseModel):
+    config: GameConfig
+    spins: int = 2_000_000
+
+
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
@@ -70,6 +76,22 @@ def bind_event_types() -> dict[str, Any]:
 def validate_bind(r: BindValidateReq) -> dict[str, Any]:
     """Bidirectional completeness check: every symbol + every event type is bound to art (the wedge)."""
     return validate_binding(r.config, r.binding).model_dump()
+
+
+@app.post("/config-hash")
+def config_hash_endpoint(config: GameConfig) -> dict[str, str]:
+    """The SHA-256 certification fingerprint of a validated config (stable, reproducible)."""
+    return {"config_hash": config_hash(config)}
+
+
+@app.post("/publish")
+def publish(r: PublishReq) -> dict[str, Any]:
+    """Build a reproducible published-math artifact: fingerprint + canonical config + engine results."""
+    try:
+        results = eng.simulate(r.config.model_dump(), r.spins)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return build_published_artifact(r.config, results)
 
 
 @app.post("/translate")

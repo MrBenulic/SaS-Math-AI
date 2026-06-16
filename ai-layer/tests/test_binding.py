@@ -2,6 +2,7 @@
 'art + certified math = one package' a hard guarantee."""
 from __future__ import annotations
 
+from app.artifact import config_hash
 from app.binding import (
     EVENT_TYPES,
     EventBinding,
@@ -86,3 +87,21 @@ def test_symbol_without_renderable_is_flagged():
     report = validate_binding(make_config(), b)
     assert not report.valid
     assert report.unrenderable_symbols == [0]
+
+
+def test_matching_targets_config_hash_is_accepted():
+    cfg = make_config()
+    b = full_binding()
+    b.targets_config_hash = config_hash(cfg)
+    report = validate_binding(cfg, b)
+    assert report.valid, report.errors
+    assert report.targets_config_hash_matches is True
+
+
+def test_wrong_targets_config_hash_is_rejected():
+    cfg = make_config()
+    b = full_binding()
+    b.targets_config_hash = "sha256:deadbeef"
+    report = validate_binding(cfg, b)
+    assert not report.valid
+    assert report.targets_config_hash_matches is False

@@ -8,7 +8,7 @@
 
 use sas_math_core::config::GameConfig;
 use sas_math_core::mechanics::Prepared;
-use sas_math_core::outcome::simulate_one_traced;
+use sas_math_core::outcome::{simulate_one_traced, WinDirection};
 use sas_math_core::simulate::simulate_one;
 
 fn load(path: &str) -> GameConfig {
@@ -122,6 +122,28 @@ fn both_ways_traced_matches_line_pay() {
         let sum: u64 = prep.line_wins(&line).iter().map(|d| d.pay).sum();
         assert_eq!(sum, prep.line_pay(&line), "line_wins != line_pay for {line:?}");
     }
+}
+
+#[test]
+fn golden_replay_sample_5x3_spin1() {
+    // Pin an exact spin: any code change that perturbs a seed's outcome is caught here (ADR-003
+    // stability-under-code-change). Values are produced by the engine itself and are deterministic
+    // cross-platform (integer accounting + ChaCha8 counter-RNG).
+    let cfg = load("examples/sample_5x3.json");
+    let prep = Prepared::new(&cfg).unwrap();
+    let o = simulate_one_traced(&prep, cfg.rng.master_seed, 1);
+
+    assert_eq!(o.total_win_units, 24);
+    assert_eq!(
+        o.grid,
+        vec![vec![4, 5, 6], vec![5, 6, 3], vec![4, 5, 6], vec![5, 6, 0], vec![3, 4, 5]]
+    );
+    assert_eq!(o.line_wins.len(), 1);
+    let w = &o.line_wins[0];
+    assert_eq!((w.line_index, w.symbol, w.count, w.pay_units), (5, 5, 4, 24));
+    assert_eq!(w.direction, WinDirection::LeftToRight);
+    assert!(o.scatter.is_none());
+    assert!(!o.cap_applied);
 }
 
 #[test]

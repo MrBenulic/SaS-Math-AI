@@ -71,14 +71,18 @@ Ordered by impact-vs-effort and the wedge. Ranks 1–3 are the foundation; the r
    silently paying zero; `both_ways` no longer double-pays a full-line win. **Remaining:** a real,
    exact `ways_243` (all-ways) implementation validated against a certified sheet.
 3. **Reproducibility as CI invariants** — *partially landed*: `simulate_one == simulate_one_traced`
-   over many spins is now a test. **Remaining:** pin a golden config-hash + reference accumulator +
-   sample event stream in CI; typed `NoFeasibleSolution` from the solver.
-4. **`presentation.bind.json` sidecar** — bind `symbol.id` + event-type tokens → Spine skeleton /
-   atlas region / spritesheet frames / sound cues; one optional non-math `presentation_ref` pointer
-   on game-config (stripped before the cert hash). A bidirectional completeness check (every symbol
-   and event must bind) **is** the "one package" guarantee. Completes the wedge.
-5. **Content-addressed published-math artifact** — canonicalize config → BLAKE3 hash + engine
-   version + integer-only artifact + `index.json`. A cheap "certification fingerprint" foothold.
+   over many spins is a test; a **golden replay vector** (exact `RoundOutcome` for a pinned
+   config/seed/spin) and a **deterministic config fingerprint** are now enforced. **Remaining:** pin a
+   reference MC accumulator; typed `NoFeasibleSolution` from the solver.
+4. **`presentation.bind.json` sidecar** — ✅ *landed*: binds `symbol.id` + a closed event-type set →
+   Spine skeleton / atlas region / spritesheet frames / sound cues; a bidirectional completeness
+   check (every symbol and event must bind) **is** the "one package" guarantee; `validate_binding`
+   also verifies an optional `targets_config_hash`. **Remaining:** a Studio UI to load Spine files and
+   show green/red coverage; an optional non-math `presentation_ref` pointer on game-config.
+5. **Content-addressed published-math artifact** — ✅ *first slice landed*: canonicalize config →
+   **SHA-256** fingerprint (regulator-recognized; in `ai-layer/app/artifact.py`) + engine results +
+   version stamps → a reproducible audit record; `POST /publish`, `POST /config-hash`. **Remaining:**
+   integer-exact rational in the record (expose the engine's `line_ratio`); an `index.json` ledger.
 6. **Scale exact capped RTP** — replace the `ENUM_LIMIT` cliff with win-value convolution/DP + a
    typed `Exact | ExactDp | NumericTailMC{ci}` boundary so large/Weights games keep an honest number.
 7. **Solver objective DSL + volatility/money-back score** — target bands instead of opaque weights,

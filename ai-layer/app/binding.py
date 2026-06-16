@@ -15,6 +15,7 @@ from typing import Optional
 
 from pydantic import BaseModel, Field
 
+from .artifact import config_hash
 from .models import GameConfig
 
 # Closed, versioned set of event types the engine's RoundOutcome can drive. A binding must cover all
@@ -77,6 +78,8 @@ class BindReport(BaseModel):
     unrenderable_symbols: list[int] = Field(default_factory=list)
     missing_events: list[str] = Field(default_factory=list)
     unknown_events: list[str] = Field(default_factory=list)
+    # None = the binding declares no target hash; True/False = it matches the config's fingerprint.
+    targets_config_hash_matches: Optional[bool] = None
     errors: list[str] = Field(default_factory=list)
 
 
@@ -99,6 +102,11 @@ def validate_binding(config: GameConfig, binding: PresentationBind) -> BindRepor
     missing_events = [et for et in EVENT_TYPES if et not in bound_events]
     unknown_events = sorted(bound_events - set(EVENT_TYPES))
 
+    # If the binding declares which config it targets, verify the fingerprint matches.
+    hash_matches: Optional[bool] = None
+    if binding.targets_config_hash is not None:
+        hash_matches = binding.targets_config_hash == config_hash(config)
+
     errors: list[str] = []
     if missing_symbols:
         errors.append(f"symbols with no art binding: {missing_symbols}")
@@ -112,6 +120,8 @@ def validate_binding(config: GameConfig, binding: PresentationBind) -> BindRepor
         errors.append(f"event types with no binding: {missing_events}")
     if unknown_events:
         errors.append(f"bindings reference unknown event types: {unknown_events}")
+    if hash_matches is False:
+        errors.append("targets_config_hash does not match this config's fingerprint")
 
     return BindReport(
         valid=not errors,
@@ -120,5 +130,6 @@ def validate_binding(config: GameConfig, binding: PresentationBind) -> BindRepor
         unrenderable_symbols=unrenderable_symbols,
         missing_events=missing_events,
         unknown_events=unknown_events,
+        targets_config_hash_matches=hash_matches,
         errors=errors,
     )
