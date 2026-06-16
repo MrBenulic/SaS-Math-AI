@@ -35,6 +35,7 @@ yarn-error.log*
 flamegraph.svg
 /sim-output/
 /artifacts/
+*.tuned.json
 
 # ---- OS / editor ----
 .DS_Store

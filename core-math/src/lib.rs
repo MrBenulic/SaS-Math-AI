@@ -12,9 +12,11 @@ pub mod enumerate;
 pub mod mechanics;
 pub mod rng;
 pub mod simulate;
+pub mod solver;
 pub mod stats;
 
 pub use config::GameConfig;
 pub use enumerate::{exact_rtp, ExactResult};
 pub use simulate::{monte_carlo, McResult};
+pub use solver::{solve, SolveOptions, SolveResult};
 pub use stats::Accumulator;

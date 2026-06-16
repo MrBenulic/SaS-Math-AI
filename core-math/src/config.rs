@@ -1,10 +1,10 @@
 //! Game-config structs — the Rust `serde` target of the tri-target schema (ADR-004).
 //! Mirrors `schema/game-config.schema.json` (M1 lines-game subset).
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GameConfig {
     pub schema_version: String,
     pub game: Game,
@@ -17,11 +17,11 @@ pub struct GameConfig {
     pub rng: RngConfig,
     #[serde(default)]
     pub features: Vec<serde_json::Value>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub targets: Option<serde_json::Value>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Game {
     pub name: String,
     pub grid: Grid,
@@ -33,13 +33,13 @@ fn default_denom() -> u64 {
     100
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Grid {
     pub reels: usize,
     pub rows: usize,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Symbol {
     pub id: usize,
     pub name: String,
@@ -48,7 +48,7 @@ pub struct Symbol {
     pub substitutes_for: Vec<usize>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum SymbolKind {
     Regular,
@@ -59,23 +59,23 @@ pub enum SymbolKind {
 /// Reels are given as explicit `strips` OR as per-symbol `weights` (the solver's tuning lever).
 /// Weights are realized into a deterministic spread strip at prepare-time (ADR-006), so the exact
 /// enumerator and Monte Carlo consume both representations through one code path.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Reels {
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub strips: Option<Vec<Vec<usize>>>,
     /// One `{symbol_id: weight}` map per reel.
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub weights: Option<Vec<HashMap<usize, u64>>>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PaytableEntry {
     pub symbol_id: usize,
     /// match-count -> payout in integer smallest-units (JSON string keys parsed to u32).
     pub pays: HashMap<u32, u64>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum LineEval {
     #[serde(rename = "left_to_right")]
     LeftToRight,
@@ -85,12 +85,12 @@ pub enum LineEval {
     Ways243,
 }
 
-#[derive(Debug, Clone, Copy, Deserialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct MaxWin {
     pub cap_x: f64,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RngConfig {
     pub generator: String,
     pub master_seed: u64,

@@ -83,7 +83,7 @@ SHEETS = {
         "rows": [
             ["Foundation", "v0.1.0", "repo, branching, ADRs, draft schema, tooling", "clean documented checkpoint", "Done"],
             ["M1", "v0.2.0", "Core Math Engine (5x3 lines)", "Parity Test passes; seed-replay identical; 10M < 2s", "In progress"],
-            ["M2", "v0.3.0", "Auto-Tuner / Solver", "broken 140% RTP config -> fixed playable 96%", "Planned"],
+            ["M2", "v0.3.0", "Auto-Tuner / Solver", "broken 140% RTP config -> fixed playable 96%", "In progress"],
             ["M3", "v0.4.0", "AI translator + FastAPI + frontend", "prompt -> JSON -> simulate -> tune in browser", "Planned"],
             ["M4", "v1.0.0", "Advanced mechanics + GLI/BMM exporter", "exported sheet matches a certified live game", "Planned"],
         ],
@@ -96,6 +96,7 @@ SHEETS = {
             ["v0.1.0", "stable", "2026-06-16", "Foundation: repo, stable/beta branching, ADRs, draft schema, workbook, plugins", "baseline checkpoint; git checkout v0.1.0"],
             ["v0.2.0-beta.1", "beta", "2026-06-16", "M1 core-math engine: namespaced RNG, integer accounting, exact+MC, CLI; 6 tests green (~19M spins/s)", "last stable = v0.1.0; git checkout v0.1.0"],
             ["v0.2.0-beta.2", "beta", "2026-06-16", "M1 cont.: exact capped enumeration (cap-erosion) + weight-reels; provenance-labeled; 9 tests green", "last stable = v0.1.0; git checkout v0.1.0"],
+            ["v0.3.0-beta.1", "beta", "2026-06-16", "M2 auto-tuner: ES weight-tuning to target RTP + realize/re-verify; gate PASS 139%->96% line game; 13 tests green", "last stable = v0.1.0; git checkout v0.1.0"],
         ],
     },
 }

@@ -13,12 +13,12 @@ deterministic **exact + Monte Carlo** math engine → auto-tuning solver → GLI
 
 ## 2. Current status
 - **Date:** 2026-06-16
-- **Version / milestone:** `v0.2.0-beta.2` — **M1 Core Math Engine** on `beta`: exact (closed-form + **capped enumeration**) + deterministic Monte Carlo, **weight-reels**. Promotion to stable `v0.2.0` pending external certified-game parity.
+- **Version / milestone:** `v0.3.0-beta.1` — **M2 Auto-Tuner/Solver** on `beta`: tunes symbol weights to a target RTP against the exact closed-form objective, then realizes + re-verifies with the integer engine (ADR-006). M1 engine complete (exact closed-form + capped enumeration, weight-reels). Stable promotion still pending external certified-game parity.
 - **Branch:** `beta` (active work). `main` holds stable `v0.1.0`.
-- **Latest stable tag:** `v0.1.0` · **Latest beta tag:** `v0.2.0-beta.2`
+- **Latest stable tag:** `v0.1.0` · **Latest beta tag:** `v0.3.0-beta.1`
 - **Repo (private):** [`MrBenulic/SaS-Math-AI`](https://github.com/MrBenulic/SaS-Math-AI)
 - **Local path:** `~/Desktop/SaS-Math AI app`
-- **M1 verified (9 tests green):** exact uncapped RTP 95.30% == MC within CI; **exact capped enumeration** (cap-erosion exact; 50x cap → 0.057% erosion; hand-check 40/27; matches MC); enumeration-uncapped == closed-form (cross-check); **weight-reels** realize to strips (ADR-006); thread-independent determinism; hand-verifiable 72/27; ~19M spins/s. Demo: `cd core-math && cargo run --release --bin cli -- examples/sample_5x3_cap50.json 5000000`.
+- **Verified (13 tests green):** M1 — exact uncapped+capped (cap-erosion exact), weight-reels, thread-independent determinism, ~19M spins/s. M2 — **solver gate PASS**: broken 139% → tuned 95.9% (line game) within 0.09% of target, re-verified by the integer engine (realize-delta 0.02%), hit-frequency 45% (not degenerate); closed-form line == engine; deterministic solve. Demo: `cd core-math && cargo run --release --bin tune -- examples/broken_lineonly.json 0.96 300`.
 
 ## 3. How to resume
 ```bash
@@ -47,7 +47,13 @@ git checkout beta                             # do new work on beta, never direc
   line-eval, **weight-reels** (realized to strips, ADR-006), deterministic Rayon Monte Carlo,
   streaming stats, provenance-labeled CLI math sheet, 9 passing tests. **Remaining for stable
   v0.2.0:** parity vs an external certified game (and `ways_243` line-eval is still a stub).
-- ⏳ v0.3.0 M2 solver · v0.4.0 M3 AI+frontend · v1.0.0 M4 advanced mechanics + GLI/BMM exporter.
+- 🟦 **v0.3.0 M2 — Auto-Tuner/Solver** (built on `beta`, tag `v0.3.0-beta.1`): `(mu/mu_w,lambda)`-ES
+  with CSA tunes symbol weights to a target RTP against the exact closed-form objective; realize +
+  re-verify (ADR-006). Gate PASS on line games. **Remaining:** scatter-model consistency for tuning
+  (solver uses a binomial proxy, the engine uses positional window — that's the re-verify delta on
+  scatter games); multi-objective volatility/hit-frequency constraints; full CMA-ES covariance;
+  PyO3 bindings.
+- ⏳ v0.4.0 M3 AI+frontend · v1.0.0 M4 advanced mechanics + GLI/BMM exporter.
 
 ## 6. Open decisions / TODO
 - **LLM provider** for Module 2 — *deferred* (decide in M3). Code a provider-agnostic interface.
@@ -90,6 +96,15 @@ git checkout beta                             # do new work on beta, never direc
   CLI shows capped RTP + cap-erosion + provenance (sample 50x cap → 0.057% erosion, exact over
   33.5M combos). Tagged `v0.2.0-beta.2`. **Remaining for stable v0.2.0:** external certified-game
   parity only (`ways_243` is a minor stub).
+- **2026-06-16 (M2)** — Auto-tuner/solver. `solver.rs`: closed-form RTP as a smooth function of
+  per-reel weights (line marginals + binomial scatter), reusing `Prepared::line_pay/scatter_pay`;
+  `(mu/mu_w,lambda)`-ES with CSA step-size control (deterministic); bounds for non-degeneracy +
+  light regularizer; `realized_config` realizes tuned weights → integer strips for re-verification
+  (ADR-006). `bin/tune.rs`: load config + target RTP → tune → re-verify (exact + MC) → write tuned
+  config. Gate PASS: `examples/broken_lineonly.json` 139.2% → 95.9% (within 0.09%), realize-delta
+  0.02%, hit-freq 42%→45%. 13 tests green (4 solver). Tagged `v0.3.0-beta.1`. **Next M2:** make the
+  engine's weighted-reel scatter independent-cell (binomial) to remove the solver↔engine scatter
+  delta; volatility/hit-freq objectives; CMA-ES covariance; PyO3.
 
 ---
 
@@ -102,10 +117,11 @@ Local path: ~/Desktop/SaS-Math AI app  (private GitHub repo MrBenulic/SaS-Math-A
 FIRST: read reboot.md, CLAUDE.md, and docs/design-decisions.md in that folder — they hold the live
 status and the locked engineering decisions (ADRs). Then read docs/roadmap.md for what's next.
 
-Current state: M1 core-math engine is BUILT on `beta` (tag v0.2.0-beta.2): closed-form + exact-capped
-enumeration, weight-reels, deterministic Monte Carlo, 9 tests green, ~19M spins/s, exact==MC within
-CI. v0.1.0 Foundation is on `main`. We work on `beta` and promote to `main` (tag vX.Y.Z) only after a
-milestone gate passes; we cut beta pre-releases as vX.Y.Z-beta.N. Always tag a stable point before
+Current state: M1 engine + M2 solver are BUILT on `beta` (tag v0.3.0-beta.1): exact closed-form +
+capped enumeration, weight-reels, deterministic Monte Carlo, and an ES auto-tuner that hits a target
+RTP and re-verifies against the integer engine. 13 tests green. Gate PASS: broken 139% → 96% line
+game. v0.1.0 Foundation is on `main`. We work on `beta` and promote to `main` (tag vX.Y.Z) only after
+a milestone gate passes; we cut beta pre-releases as vX.Y.Z-beta.N. Always tag a stable point before
 risky changes.
 
 Non-negotiables (see CLAUDE.md / ADRs): integer/u128 money accounting; counter-based NAMESPACED RNG
@@ -113,8 +129,10 @@ Non-negotiables (see CLAUDE.md / ADRs): integer/u128 money accounting; counter-b
 exact combinatorial math is the certification source of truth and MC only validates the harness +
 non-enumerable features; max-win cap is modeled inside the math; the LLM never writes code.
 
-Next: finish M1 -> stable v0.2.0 — the ONLY remaining gate is parity vs an external CERTIFIED
-reference game (cap-in-exact-math and weight-reels are DONE; ways_243 line-eval is a minor stub).
-Then M2 (the solver). See docs/roadmap.md and core-math/README.md; run `cargo test --release` in
-core-math/. Do work on `beta`; keep reboot.md and the Excel tracker up to date.
+Next M2 refinements: (1) make weighted-reel scatter independent-cell/binomial in the ENGINE so the
+solver's objective matches re-verification exactly on scatter games (currently a ~5% scatter-only
+realize delta — line games are already exact); (2) add volatility/hit-frequency objectives; (3) full
+CMA-ES covariance; (4) PyO3 bindings. Stable promotion still needs external CERTIFIED-game parity.
+Then M3 (AI translator + FastAPI + Next.js frontend). See docs/roadmap.md, core-math/README.md;
+run `cargo test --release` in core-math/. Do work on `beta`; keep reboot.md + the Excel tracker current.
 ```
