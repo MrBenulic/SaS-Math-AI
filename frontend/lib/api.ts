@@ -60,10 +60,50 @@ export interface TranslateResult {
   targets: { rtp: number | null; volatility: string | null; hit_frequency: number | null } | null;
 }
 
+// ---- Art binding (the art↔math bridge) ----
+export interface SymbolBinding {
+  symbol_id: number;
+  skeleton?: string;
+  atlas?: string;
+  atlas_region?: string;
+  spritesheet?: { sheet: string; frames?: string[]; fps?: number };
+  sound_cue?: string;
+  idle_anim?: string;
+  land_anim?: string;
+  win_anim?: string;
+}
+export interface EventBinding {
+  event_type: string;
+  anim?: string;
+  sound?: string;
+  blocking?: boolean;
+  min_duration_ms?: number;
+}
+export interface PresentationBind {
+  bind_version?: string;
+  targets_config_hash?: string | null;
+  symbols: SymbolBinding[];
+  events: EventBinding[];
+}
+export interface BindReport {
+  valid: boolean;
+  missing_symbols: number[];
+  unknown_symbols: number[];
+  unrenderable_symbols: number[];
+  missing_events: string[];
+  unknown_events: string[];
+  targets_config_hash_matches: boolean | null;
+  errors: string[];
+}
+
 export const api = {
   health: () => fetch(BASE + "/health").then((r) => r.json()),
   translate: (prompt: string) => post<TranslateResult>("/translate", { prompt }),
   simulate: (config: unknown, spins = 500_000) => post<SimResult>("/simulate", { config, spins }),
   tune: (config: unknown, target_rtp: number, generations = 120) =>
     post<TuneResult>("/tune", { config, target_rtp, generations }),
+  eventTypes: () =>
+    fetch(BASE + "/bind/event-types").then((r) => r.json()) as Promise<{ event_types: string[] }>,
+  validateBind: (config: unknown, binding: PresentationBind) =>
+    post<BindReport>("/validate-bind", { config, binding }),
 };

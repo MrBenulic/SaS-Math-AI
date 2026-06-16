@@ -175,6 +175,18 @@ git checkout beta                             # do new work on beta, never direc
   To be tagged `v0.4.0-beta.5`. **Next (no LLM/cert needed):** Studio UI to drop in Spine files and see
   binding coverage; expose the engine's exact integer rational into the artifact; `index.json` ledger;
   typed `NoFeasibleSolution`; then exact `ways_243` with hand-verified tests.
+- **2026-06-16 (Studio art-binding UI)** — Added **"4 · Art binding"** to the Next.js Slot Studio:
+  `frontend/components/BindingPanel.tsx` (drag-drop / browse / paste file names → auto-match each
+  symbol to an asset by name → live **green/red coverage matrix** per symbol + per event, calling
+  `POST /validate-bind`), plus `lib/api.ts` binding types + `validateBind`/`eventTypes`, and
+  `store/useStore.ts` bind state/actions (auto-match + validate). **Browser-verified** via preview
+  tools: Translate → load `wild/scatter/h1/h2/l1.json` (omitting L2/L3) → red banner "✗ 2 coverage
+  gaps", L2/L3 dots red, others green; add `l2/l3.json` → green "✓ Complete — Art + certified math =
+  one package". No console errors; `tsc --noEmit` clean. To be tagged `v0.4.0-beta.6`. **Next (no
+  LLM/cert needed):** richer per-symbol binding (idle/land/win anims, sound) + export the bind file;
+  expose the engine's exact integer rational into the published artifact; `index.json` ledger; typed
+  `NoFeasibleSolution`; then exact `ways_243` with hand-verified tests. Run: ai-layer uvicorn :8000 +
+  `frontend npm run dev` :3000 (engine only needed for simulate/tune/publish, not bind).
 
 ---
 

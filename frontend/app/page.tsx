@@ -2,6 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { useStore } from "@/store/useStore";
+import BindingPanel from "@/components/BindingPanel";
 
 const Editor = dynamic(() => import("@monaco-editor/react"), { ssr: false });
 
@@ -118,6 +119,9 @@ export default function Home() {
               </div>
             )}
           </div>
+
+          {/* 4. Art binding */}
+          <BindingPanel />
         </section>
 
         {/* Config editor */}
