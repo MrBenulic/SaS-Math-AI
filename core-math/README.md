@@ -1,7 +1,7 @@
 # core-math (Rust) — Module 3 + 4
 
 The deterministic math engine **+ M2 auto-tuner**. On `beta`, tagged `v0.2.0-beta.2` (M1 engine) /
-`v0.3.0-beta.1` (M2 solver). This is a **pure Rust crate** (no Python/FFI in the core; ADR-007).
+`v0.3.0-beta.2` (M2 solver). This is a **pure Rust crate** (no Python/FFI in the core; ADR-007).
 
 **M1 status (verified, 9 tests green):** closed-form uncapped RTP **and exact capped enumeration**
 (`min(win,cap)` per outcome atom; feasibility-bounded with a numeric-MC fallback labeled by
@@ -12,12 +12,14 @@ hand-verifiable ratios (72/27 uncapped, 40/27 capped); ~19M spins/s. Run it:
 **Remaining before stable `v0.2.0`:** parity against an external **certified** reference game
 (`ways_243` line-eval is a minor stub).
 
-**M2 auto-tuner (`solver.rs`, `bin/tune.rs`):** tunes per-reel symbol weights to a target RTP against
-the exact closed-form objective (`(mu/mu_w,lambda)`-ES with CSA), then realizes integer strips and
-re-verifies with the engine (ADR-006). Gate PASS — broken 139% → 96% on a line game:
-`cargo run --release --bin tune -- examples/broken_lineonly.json 0.96 300`. Known follow-up: align the
-engine's weighted-reel scatter to the solver's independent-cell model to remove the re-verify delta on
-scatter games.
+**M2 auto-tuner (`solver.rs`, `bin/tune.rs`):** tunes per-reel symbol weights to **RTP + volatility +
+hit-frequency** (RTP via the exact closed-form objective; vol/hit via CRN Monte Carlo, ADR-006), then
+realizes integer **weighted reels** and re-verifies with the engine. Weighted reels use the
+independent-cell model, so the solver and re-verify agree (scatter games re-verify with <1% delta).
+Gate PASS — broken 139% → 96%:
+`cargo run --release --bin tune -- examples/broken_143.json 0.96 250` (scatter), or
+`cargo run --release --bin tune -- examples/broken_lineonly.json 0.96 150 3.0` (RTP + volatility 3.0).
+Next: full CMA-ES covariance adaptation; PyO3 bindings.
 
 ## Planned layout
 ```

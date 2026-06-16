@@ -1,42 +1,31 @@
 //! Exact RTP (ADR-001) — the certification source of truth.
 //!
-//! Two layers:
-//!  - **Closed-form uncapped RTP.** By linearity of expectation, line pays decompose to per-reel
-//!    symbol marginals and scatter pays to a window-count convolution. Fast, exact, integer.
-//!  - **Exact capped RTP (ADR-005).** The max-win cap is a non-linear clamp on the *per-spin total*,
-//!    so it needs the joint outcome distribution. For the single-spin engine that space is finite:
-//!    enumerate column-tuples, apply `min(win, cap)` to each atom, average. EXACT — when the space
-//!    is small enough. Above `ENUM_LIMIT` we fall back to high-N Monte Carlo, **labeled numeric**
-//!    (never reported as closed-form exact). Once variable-length bonus rounds exist the round-level
-//!    distribution is no longer finitely enumerable and the numeric tail becomes mandatory.
-//!
-//! Built-in cross-check: the enumeration's *uncapped* sum must exactly equal the closed-form RTP
-//! (see `enumerate_capped().uncapped_rtp`).
+//! - **Line pays:** per-reel symbol marginal (`sym_count / reel_size`), summed over symbol-tuples.
+//!   Integer-exact for both reel models.
+//! - **Scatter pays:** Strips -> positional window-count convolution (integer); Weights ->
+//!   independent-cell binomial-per-reel convolution (f64, the model's exact value).
+//! - **Capped RTP (ADR-005):** Strips only — enumerate the finite column-tuple space, `min(win,cap)`
+//!   per atom, average. `None` for Weights (independent-cell space is not finitely enumerable -> the
+//!   capped figure comes from the numeric MC tail). Cross-check: enumeration-uncapped == closed-form.
 
 use crate::accounting::Rational;
-use crate::mechanics::{Prepared, MAX_REELS};
+use crate::mechanics::{Prepared, ReelModel, MAX_REELS};
 use rayon::prelude::*;
 
-/// Max number of column-tuples we will enumerate exactly. Above this, capped RTP is numeric (MC).
 pub const ENUM_LIMIT: u128 = 500_000_000;
 
 #[derive(Debug, Clone)]
 pub struct ExactResult {
-    /// Uncapped total RTP (closed-form marginal).
     pub rtp: f64,
     pub line_rtp: f64,
     pub scatter_rtp: f64,
-    /// Exact integer ratio of the line component (handy for hand-verification).
     pub line_ratio: Rational,
-    /// `Some` => exact-enumerated capped RTP. `None` => enumeration too large; use a numeric MC tail.
     pub capped: Option<f64>,
-    /// Enumeration size when capped is exact; 0 when it falls back to numeric.
     pub combos: u128,
     pub note: &'static str,
 }
 
 impl ExactResult {
-    /// Provenance label for the capped figure.
     pub fn capped_provenance(&self) -> &'static str {
         if self.capped.is_some() {
             "exact-enumerated"
@@ -54,100 +43,145 @@ pub struct CappedEnum {
 }
 
 pub fn exact_rtp(prep: &Prepared) -> ExactResult {
-    let mut d: u128 = 1;
-    for r in 0..prep.reels {
-        d = d.saturating_mul(prep.strip_len[r] as u128);
-    }
+    let (line_num, line_den) = line_exact(prep);
+    let line_rtp = if line_den == 0 { 0.0 } else { line_num as f64 / line_den as f64 };
+    let scatter_rtp = scatter_rtp_exact(prep);
 
-    // ---- closed-form uncapped line + scatter
-    let mut line_acc: u128 = 0;
-    let mut tuple = vec![0usize; prep.reels];
-    enum_tuples(prep, 0, 1, &mut tuple, &mut line_acc);
-    let line_num = line_acc.saturating_mul(prep.paylines.len() as u128);
-    let scatter_num = scatter_numerator(prep);
-    let den = d.saturating_mul(prep.bet_units as u128);
-    let to_rtp = |num: u128| if den == 0 { 0.0 } else { num as f64 / den as f64 };
-
-    // ---- exact capped enumeration (if feasible)
     let ce = enumerate_capped(prep);
 
     ExactResult {
-        rtp: to_rtp(line_num.saturating_add(scatter_num)),
-        line_rtp: to_rtp(line_num),
-        scatter_rtp: to_rtp(scatter_num),
-        line_ratio: Rational { num: line_num, den },
+        rtp: line_rtp + scatter_rtp,
+        line_rtp,
+        scatter_rtp,
+        line_ratio: Rational { num: line_num, den: line_den },
         capped: ce.map(|e| e.capped_rtp),
         combos: ce.map(|e| e.combos).unwrap_or(0),
-        note: "uncapped = closed-form; capped = exact enumeration when feasible, else numeric MC tail",
+        note: "line = integer marginal; scatter = window(Strips)/binomial(Weights); capped exact when enumerable, else numeric MC",
     }
 }
 
-/// Recurse over reels building a symbol-tuple, accumulating product-of-counts * line_pay.
-fn enum_tuples(prep: &Prepared, reel: usize, prod_count: u128, tuple: &mut Vec<usize>, acc: &mut u128) {
+/// Exact line RTP as an integer ratio (num, den). Uses the per-reel symbol marginal for both models.
+fn line_exact(prep: &Prepared) -> (u128, u128) {
+    let mut d: u128 = 1;
+    for r in 0..prep.reels {
+        d = d.saturating_mul(prep.reel_size[r] as u128);
+    }
+    let mut acc: u128 = 0;
+    let mut tuple = vec![0usize; prep.reels];
+    line_enum(prep, 0, 1, &mut tuple, &mut acc);
+    let num = acc.saturating_mul(prep.paylines.len() as u128);
+    (num, d.saturating_mul(prep.bet_units as u128))
+}
+
+fn line_enum(prep: &Prepared, reel: usize, prod: u128, tuple: &mut Vec<usize>, acc: &mut u128) {
     if reel == prep.reels {
         let pay = prep.line_pay(tuple) as u128;
         if pay > 0 {
-            *acc = acc.saturating_add(prod_count.saturating_mul(pay));
+            *acc = acc.saturating_add(prod.saturating_mul(pay));
         }
         return;
     }
     for sym in 0..prep.n_symbols {
-        let c = prep.strip_counts[reel][sym];
+        let c = prep.sym_count[reel][sym];
         if c == 0 {
             continue;
         }
         tuple[reel] = sym;
-        enum_tuples(prep, reel + 1, prod_count.saturating_mul(c as u128), tuple, acc);
+        line_enum(prep, reel + 1, prod.saturating_mul(c as u128), tuple, acc);
     }
 }
 
-/// Number of stop-combinations (out of D) weighted by scatter payout, via per-reel convolution.
-fn scatter_numerator(prep: &Prepared) -> u128 {
-    if prep.scatter_id.is_none() {
-        return 0;
+fn binom(n: usize, k: usize) -> f64 {
+    if k > n {
+        return 0.0;
     }
-    let mut conv: Vec<u128> = vec![1]; // 1 combo, 0 scatters
-    for r in 0..prep.reels {
-        let mut per = vec![0u128; prep.rows + 1];
-        for col in &prep.columns[r] {
-            per[col.scatters as usize] += 1;
-        }
-        let mut next = vec![0u128; conv.len() + prep.rows];
-        for (i, &ci) in conv.iter().enumerate() {
-            if ci == 0 {
-                continue;
+    let mut r = 1.0;
+    for i in 0..k {
+        r = r * (n - i) as f64 / (i + 1) as f64;
+    }
+    r
+}
+
+fn scatter_rtp_exact(prep: &Prepared) -> f64 {
+    let sid = match prep.scatter_id {
+        Some(s) => s,
+        None => return 0.0,
+    };
+    let bet = prep.bet_units as f64;
+    match prep.model {
+        ReelModel::Strips => {
+            let mut d: u128 = 1;
+            for r in 0..prep.reels {
+                d = d.saturating_mul(prep.reel_size[r] as u128);
             }
-            for (j, &pj) in per.iter().enumerate() {
-                if pj == 0 {
-                    continue;
+            let mut conv: Vec<u128> = vec![1];
+            for r in 0..prep.reels {
+                let mut per = vec![0u128; prep.rows + 1];
+                for col in &prep.columns[r] {
+                    per[col.scatters as usize] += 1;
                 }
-                next[i + j] = next[i + j].saturating_add(ci.saturating_mul(pj));
+                let mut next = vec![0u128; conv.len() + prep.rows];
+                for (i, &ci) in conv.iter().enumerate() {
+                    if ci == 0 {
+                        continue;
+                    }
+                    for (j, &pj) in per.iter().enumerate() {
+                        if pj == 0 {
+                            continue;
+                        }
+                        next[i + j] = next[i + j].saturating_add(ci.saturating_mul(pj));
+                    }
+                }
+                conv = next;
             }
+            let mut num = 0u128;
+            for (k, &cnt) in conv.iter().enumerate() {
+                if cnt > 0 {
+                    num = num.saturating_add(cnt.saturating_mul(prep.scatter_pay(k) as u128));
+                }
+            }
+            if d == 0 { 0.0 } else { num as f64 / (d as f64 * bet) }
         }
-        conv = next;
-    }
-    let mut num = 0u128;
-    for (k, &cnt) in conv.iter().enumerate() {
-        if cnt > 0 {
-            num = num.saturating_add(cnt.saturating_mul(prep.scatter_pay(k) as u128));
+        ReelModel::Weights => {
+            // independent-cell: per reel scatter count ~ Binomial(rows, p), convolved across reels
+            let mut conv = vec![1.0f64];
+            for r in 0..prep.reels {
+                let p = prep.sym_count[r][sid] as f64 / prep.reel_size[r] as f64;
+                let mut bin = vec![0.0; prep.rows + 1];
+                for k in 0..=prep.rows {
+                    bin[k] = binom(prep.rows, k) * p.powi(k as i32) * (1.0 - p).powi((prep.rows - k) as i32);
+                }
+                let mut next = vec![0.0; conv.len() + prep.rows];
+                for (i, &ci) in conv.iter().enumerate() {
+                    for (j, &bj) in bin.iter().enumerate() {
+                        next[i + j] += ci * bj;
+                    }
+                }
+                conv = next;
+            }
+            let mut e = 0.0;
+            for (k, &pk) in conv.iter().enumerate() {
+                e += pk * prep.scatter_pay(k) as f64;
+            }
+            e / bet
         }
     }
-    num
 }
 
-/// Exact capped RTP via column-tuple enumeration. `None` when the space exceeds `ENUM_LIMIT`.
-/// Also returns the uncapped sum from the SAME pass — it must equal the closed-form RTP.
+/// Exact capped RTP via column-tuple enumeration (Strips only). `None` for Weights or when the
+/// space exceeds `ENUM_LIMIT`.
 pub fn enumerate_capped(prep: &Prepared) -> Option<CappedEnum> {
+    if prep.model != ReelModel::Strips {
+        return None;
+    }
     let mut d: u128 = 1;
     for r in 0..prep.reels {
-        d = d.saturating_mul(prep.strip_len[r] as u128);
+        d = d.saturating_mul(prep.reel_size[r] as u128);
     }
     if d == 0 || d > ENUM_LIMIT {
         return None;
     }
     let cap = prep.cap_units;
-
-    // parallelize over reel 0's stops; each branch enumerates the remaining reels sequentially.
     let (sum_c, sum_u): (u128, u128) = prep.columns[0]
         .par_iter()
         .enumerate()
@@ -166,7 +200,6 @@ pub fn enumerate_capped(prep: &Prepared) -> Option<CappedEnum> {
     })
 }
 
-/// Recurse reels `reel..`, with reel 0 already pinned in `chosen`. Returns (Σcapped, Σuncapped).
 fn rec_capped(prep: &Prepared, reel: usize, chosen: &mut [usize; MAX_REELS], scat: u32, cap: u64) -> (u128, u128) {
     if reel == prep.reels {
         let mut total: u64 = 0;

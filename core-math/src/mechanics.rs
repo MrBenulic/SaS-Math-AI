@@ -1,16 +1,28 @@
-//! Line / scatter pay "Lego blocks" + the prepared engine model. The SAME payout semantics are
-//! used by both the exact engine and Monte Carlo, so agreement between them is meaningful.
+//! Line / scatter pay "Lego blocks" + the prepared engine model.
 //!
-//! Reels may be given as explicit strips or as per-symbol weights; weights are realized into a
-//! deterministic spread strip here (ADR-006), so everything downstream sees one representation.
+//! Two reel models share the same payout semantics (`line_pay` / `scatter_pay`):
+//!  - **Strips** (physical reels): the visible window is `rows` consecutive strip positions, so
+//!    scatter counting is positional and the per-spin outcome space is finitely enumerable.
+//!  - **Weights** (virtual reels): each visible cell is an independent weighted draw, so scatter
+//!    follows a binomial-per-reel model. This is the solver's tuning representation (ADR-006); the
+//!    solver's closed-form objective and the engine's re-verification then use the SAME model.
+//!
+//! Either way the per-reel symbol marginal (used for line pays) is `sym_count / reel_size`.
 
 use crate::config::{GameConfig, LineEval, SymbolKind};
-use std::collections::HashMap;
 
 pub const MAX_REELS: usize = 16;
 pub const MAX_ROWS: usize = 8;
 
-/// One reel-stop's visible column: the symbol at each row, plus the scatter count in the window.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ReelModel {
+    /// Physical strips: positional window scatter; finite outcome space.
+    Strips,
+    /// Virtual weighted reels: independent-cell draws; binomial scatter.
+    Weights,
+}
+
+/// One reel-stop's visible column (Strips model only): symbol per row + scatter count.
 #[derive(Debug, Clone)]
 pub struct ColumnInfo {
     pub syms: [usize; MAX_ROWS],
@@ -21,57 +33,37 @@ pub struct Prepared {
     pub reels: usize,
     pub rows: usize,
     pub bet_units: u64,
-    /// floor(cap_x * bet_units); `u64::MAX` when effectively non-binding.
     pub cap_units: u64,
     pub line_eval: LineEval,
     pub paylines: Vec<Vec<usize>>,
-    /// Realized reel strips (weights are spread into strips at prepare-time).
-    pub strips: Vec<Vec<usize>>,
-    pub strip_len: Vec<u32>,
     pub n_symbols: usize,
-    pub max_count: usize, // reels * rows (max scatter count)
+    pub max_count: usize,
     pub is_wild: Vec<bool>,
     pub is_scatter: Vec<bool>,
-    /// pays[symbol_id][count] -> payout units (0 if undefined). count in 0..=max_count.
     pub pays: Vec<Vec<u64>>,
     pub scatter_id: Option<usize>,
-    /// strip_counts[reel][symbol_id] -> occurrences on that reel's strip.
-    pub strip_counts: Vec<Vec<u64>>,
-    /// columns[reel][stop] -> visible column for that stop (for exact cap enumeration).
-    pub columns: Vec<Vec<ColumnInfo>>,
-    /// true if reels were specified as weights (realized to strips).
-    pub from_weights: bool,
-}
 
-/// Realize a `{symbol_id: weight}` map into a strip by largest-remainder spreading (even layout,
-/// deterministic). Symbol `s` appears exactly `weight_s` times.
-fn realize_weights(weights: &HashMap<usize, u64>) -> Vec<usize> {
-    let total: u64 = weights.values().copied().sum();
-    let mut syms: Vec<usize> = weights.keys().copied().filter(|s| weights[s] > 0).collect();
-    syms.sort_unstable();
-    let mut placed: HashMap<usize, u64> = syms.iter().map(|&s| (s, 0u64)).collect();
-    let mut strip = Vec::with_capacity(total as usize);
-    for _ in 0..total {
-        let mut best: Option<usize> = None;
-        let mut best_val = f64::INFINITY;
-        for &s in &syms {
-            let w = weights[&s];
-            if placed[&s] < w {
-                let val = (placed[&s] + 1) as f64 / w as f64;
-                if val < best_val - 1e-12 {
-                    best_val = val;
-                    best = Some(s);
-                }
-            }
-        }
-        let s = best.expect("weights must be positive");
-        strip.push(s);
-        *placed.get_mut(&s).unwrap() += 1;
-    }
-    strip
+    pub model: ReelModel,
+    /// Per-reel symbol "count": strip occurrences (Strips) or weight (Weights). Drives line marginals.
+    pub sym_count: Vec<Vec<u64>>,
+    /// Per-reel total: strip length (Strips) or sum of weights (Weights).
+    pub reel_size: Vec<u64>,
+
+    // ---- Strips model only (empty for Weights) ----
+    pub strips: Vec<Vec<usize>>,
+    pub columns: Vec<Vec<ColumnInfo>>,
+
+    // ---- Weights model only (empty for Strips) ----
+    /// Per reel: symbol ids with positive weight, and their cumulative weights (for MC sampling).
+    pub wsyms: Vec<Vec<usize>>,
+    pub wcum: Vec<Vec<u64>>,
 }
 
 impl Prepared {
+    pub fn is_weighted(&self) -> bool {
+        self.model == ReelModel::Weights
+    }
+
     pub fn new(cfg: &GameConfig) -> Result<Prepared, String> {
         let reels = cfg.game.grid.reels;
         let rows = cfg.game.grid.rows;
@@ -80,26 +72,6 @@ impl Prepared {
         }
         if rows == 0 || rows > MAX_ROWS {
             return Err(format!("rows must be 1..={MAX_ROWS}, got {rows}"));
-        }
-
-        // Resolve the reel representation into strips.
-        let (strips, from_weights): (Vec<Vec<usize>>, bool) =
-            match (&cfg.reels.strips, &cfg.reels.weights) {
-                (Some(s), _) => (s.clone(), false),
-                (None, Some(w)) => (w.iter().map(realize_weights).collect(), true),
-                (None, None) => return Err("reels must provide `strips` or `weights`".into()),
-            };
-        if strips.len() != reels {
-            return Err(format!("reels has {} reels but grid.reels = {reels}", strips.len()));
-        }
-
-        for (r, line) in cfg.paylines.iter().enumerate() {
-            if line.len() != reels {
-                return Err(format!("payline {r} has {} cells, expected {reels}", line.len()));
-            }
-            if line.iter().any(|&row| row >= rows) {
-                return Err(format!("payline {r} references a row >= rows ({rows})"));
-            }
         }
 
         let n_symbols = cfg.symbols.iter().map(|s| s.id).max().map(|m| m + 1).unwrap_or(0);
@@ -132,36 +104,87 @@ impl Prepared {
             }
         }
 
-        let mut strip_counts = vec![vec![0u64; n_symbols]; reels];
-        let mut strip_len = vec![0u32; reels];
-        let mut columns: Vec<Vec<ColumnInfo>> = Vec::with_capacity(reels);
-        for (r, strip) in strips.iter().enumerate() {
-            if strip.is_empty() {
-                return Err(format!("reel {r} strip is empty"));
-            }
-            let len = strip.len();
-            strip_len[r] = len as u32;
-            for &sym in strip {
-                if sym >= n_symbols {
-                    return Err(format!("reel {r} references unknown symbol id {sym}"));
+        // Resolve the reel model.
+        let model;
+        let mut sym_count = vec![vec![0u64; n_symbols]; reels];
+        let mut reel_size = vec![0u64; reels];
+        let mut strips: Vec<Vec<usize>> = Vec::new();
+        let mut columns: Vec<Vec<ColumnInfo>> = Vec::new();
+        let mut wsyms: Vec<Vec<usize>> = Vec::new();
+        let mut wcum: Vec<Vec<u64>> = Vec::new();
+
+        match (&cfg.reels.strips, &cfg.reels.weights) {
+            (Some(s), _) => {
+                model = ReelModel::Strips;
+                if s.len() != reels {
+                    return Err(format!("reels.strips has {} reels but grid.reels = {reels}", s.len()));
                 }
-                strip_counts[r][sym] += 1;
-            }
-            // precompute each stop's visible column
-            let mut reel_cols = Vec::with_capacity(len);
-            for stop in 0..len {
-                let mut syms = [0usize; MAX_ROWS];
-                let mut scatters = 0u32;
-                for row in 0..rows {
-                    let sym = strip[(stop + row) % len];
-                    syms[row] = sym;
-                    if is_scatter[sym] {
-                        scatters += 1;
+                strips = s.clone();
+                for (r, strip) in strips.iter().enumerate() {
+                    if strip.is_empty() {
+                        return Err(format!("reel {r} strip is empty"));
                     }
+                    reel_size[r] = strip.len() as u64;
+                    for &sym in strip {
+                        if sym >= n_symbols {
+                            return Err(format!("reel {r} references unknown symbol id {sym}"));
+                        }
+                        sym_count[r][sym] += 1;
+                    }
+                    let len = strip.len();
+                    let mut reel_cols = Vec::with_capacity(len);
+                    for stop in 0..len {
+                        let mut syms = [0usize; MAX_ROWS];
+                        let mut scatters = 0u32;
+                        for row in 0..rows {
+                            let sym = strip[(stop + row) % len];
+                            syms[row] = sym;
+                            if is_scatter[sym] {
+                                scatters += 1;
+                            }
+                        }
+                        reel_cols.push(ColumnInfo { syms, scatters });
+                    }
+                    columns.push(reel_cols);
                 }
-                reel_cols.push(ColumnInfo { syms, scatters });
             }
-            columns.push(reel_cols);
+            (None, Some(w)) => {
+                model = ReelModel::Weights;
+                if w.len() != reels {
+                    return Err(format!("reels.weights has {} reels but grid.reels = {reels}", w.len()));
+                }
+                wsyms = vec![Vec::new(); reels];
+                wcum = vec![Vec::new(); reels];
+                for (r, wmap) in w.iter().enumerate() {
+                    let mut ids: Vec<usize> = wmap.keys().copied().filter(|s| wmap[s] > 0).collect();
+                    ids.sort_unstable();
+                    if ids.is_empty() {
+                        return Err(format!("reel {r} has no positive weights"));
+                    }
+                    let mut cum = 0u64;
+                    for &sym in &ids {
+                        if sym >= n_symbols {
+                            return Err(format!("reel {r} references unknown symbol id {sym}"));
+                        }
+                        let wv = wmap[&sym];
+                        sym_count[r][sym] = wv;
+                        cum += wv;
+                        wsyms[r].push(sym);
+                        wcum[r].push(cum);
+                    }
+                    reel_size[r] = cum;
+                }
+            }
+            (None, None) => return Err("reels must provide `strips` or `weights`".into()),
+        }
+
+        for (r, line) in cfg.paylines.iter().enumerate() {
+            if line.len() != reels {
+                return Err(format!("payline {r} has {} cells, expected {reels}", line.len()));
+            }
+            if line.iter().any(|&row| row >= rows) {
+                return Err(format!("payline {r} references a row >= rows ({rows})"));
+            }
         }
 
         let cap_units = {
@@ -180,21 +203,34 @@ impl Prepared {
             cap_units,
             line_eval: cfg.line_eval,
             paylines: cfg.paylines.clone(),
-            strips,
-            strip_len,
             n_symbols,
             max_count,
             is_wild,
             is_scatter,
             pays,
             scatter_id,
-            strip_counts,
+            model,
+            sym_count,
+            reel_size,
+            strips,
             columns,
-            from_weights,
+            wsyms,
+            wcum,
         })
     }
 
-    /// Leading run length from reel 0 for candidate paying symbol `sym` (wilds substitute).
+    /// Sample a symbol on reel `r` from its weight distribution given a uniform draw `x < reel_size`.
+    #[inline]
+    pub fn sample_weighted(&self, r: usize, x: u64) -> usize {
+        let cum = &self.wcum[r];
+        // linear scan (few symbols); cum is ascending and last == reel_size
+        let mut i = 0;
+        while i < cum.len() && x >= cum[i] {
+            i += 1;
+        }
+        self.wsyms[r][i.min(cum.len() - 1)]
+    }
+
     #[inline]
     fn run_len(&self, sym: usize, line: &[usize]) -> usize {
         let sym_is_wild = self.is_wild[sym];
@@ -224,7 +260,6 @@ impl Prepared {
         }
     }
 
-    /// Payout (units) for one payline given the symbol on each reel, left-to-right.
     fn line_pay_ltr(&self, line: &[usize]) -> u64 {
         if line.is_empty() || self.is_scatter[line[0]] {
             return 0;
@@ -246,7 +281,6 @@ impl Prepared {
         }
     }
 
-    /// Public per-line payout honoring `line_eval`.
     #[inline]
     pub fn line_pay(&self, line: &[usize]) -> u64 {
         match self.line_eval {
@@ -260,11 +294,10 @@ impl Prepared {
                 }
                 l + self.line_pay_ltr(&rev[..n])
             }
-            LineEval::Ways243 => 0, // not supported in M1
+            LineEval::Ways243 => 0,
         }
     }
 
-    /// Scatter payout for `count` scatters anywhere in the window (clamped to the table).
     #[inline]
     pub fn scatter_pay(&self, count: usize) -> u64 {
         match self.scatter_id {

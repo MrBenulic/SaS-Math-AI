@@ -18,5 +18,5 @@ pub mod stats;
 pub use config::GameConfig;
 pub use enumerate::{exact_rtp, ExactResult};
 pub use simulate::{monte_carlo, McResult};
-pub use solver::{solve, SolveOptions, SolveResult};
+pub use solver::{solve, solve_multi, SolveOptions, SolveResult, SolveTargets};
 pub use stats::Accumulator;

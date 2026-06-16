@@ -135,8 +135,9 @@ fn enumeration_uncapped_equals_closed_form() {
 }
 
 #[test]
-fn weights_realize_to_equivalent_strip() {
-    // per-reel weights {0:2, 1:1} spread to strip [0,0,1] — identical to the tiny strips game.
+fn weights_match_strips_on_line_pays() {
+    // Weighted reels use the independent-cell model; the per-reel symbol MARGINAL equals the strip
+    // frequency, so LINE RTP is identical to the equivalent strips game (this game is line-only).
     let json = r#"{
       "schema_version":"0.1.0",
       "game":{"name":"tiny-weighted","grid":{"reels":3,"rows":1},"bet_units":1,"denomination_scale":1},
@@ -150,10 +151,10 @@ fn weights_realize_to_equivalent_strip() {
     }"#;
     let cfg = GameConfig::from_json_str(json).unwrap();
     let prep = Prepared::new(&cfg).unwrap();
-    assert!(prep.from_weights, "should be realized from weights");
+    assert!(prep.is_weighted(), "should use the weighted (independent-cell) model");
 
     let exact = exact_rtp(&prep);
-    assert_eq!(exact.line_ratio.num, 72, "weights must give the same exact math as strips");
+    assert_eq!(exact.line_ratio.num, 72, "weights must give the same exact LINE math as strips");
     assert_eq!(exact.line_ratio.den, 27);
 
     let n = 2_000_000u64;

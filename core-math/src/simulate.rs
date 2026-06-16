@@ -1,8 +1,11 @@
 //! Deterministic Monte Carlo (ADR-002, ADR-003). Each spin is seeded only by
-//! `(master_seed, spin_index)`, so results are identical regardless of how Rayon schedules
-//! threads. Integer accounting makes the parallel reduction exactly reproducible.
+//! `(master_seed, spin_index)`, so results are identical regardless of thread scheduling. Integer
+//! accounting makes the parallel reduction exactly reproducible.
+//!
+//! Strips model: draw one stop per reel, read the consecutive window. Weights model: draw each
+//! visible cell independently from the reel's weight distribution (matches the binomial exact math).
 
-use crate::mechanics::{Prepared, MAX_REELS};
+use crate::mechanics::{Prepared, ReelModel, MAX_REELS, MAX_ROWS};
 use crate::rng::{NamespacedRng, NS_BASE_REELS};
 use crate::stats::Accumulator;
 use rayon::prelude::*;
@@ -18,32 +21,43 @@ pub struct McResult {
 pub fn simulate_one(prep: &Prepared, master_seed: u64, spin_index: u64) -> u64 {
     let mut rng = NamespacedRng::for_spin(master_seed, NS_BASE_REELS, spin_index);
 
-    let mut stops = [0u32; MAX_REELS];
-    for r in 0..prep.reels {
-        stops[r] = rng.below(prep.strip_len[r]);
+    // build the visible grid[reel][row]
+    let mut grid = [[0usize; MAX_ROWS]; MAX_REELS];
+    match prep.model {
+        ReelModel::Strips => {
+            for r in 0..prep.reels {
+                let len = prep.reel_size[r] as usize;
+                let stop = rng.below(prep.reel_size[r] as u32) as usize;
+                for row in 0..prep.rows {
+                    grid[r][row] = prep.strips[r][(stop + row) % len];
+                }
+            }
+        }
+        ReelModel::Weights => {
+            for r in 0..prep.reels {
+                let size = prep.reel_size[r] as u32;
+                for row in 0..prep.rows {
+                    let x = rng.below(size) as u64;
+                    grid[r][row] = prep.sample_weighted(r, x);
+                }
+            }
+        }
     }
 
     let mut total: u64 = 0;
-
-    // line wins
     let mut line_syms = [0usize; MAX_REELS];
     for line in &prep.paylines {
         for r in 0..prep.reels {
-            let len = prep.strip_len[r] as usize;
-            let pos = (stops[r] as usize + line[r]) % len;
-            line_syms[r] = prep.strips[r][pos];
+            line_syms[r] = grid[r][line[r]];
         }
         total = total.saturating_add(prep.line_pay(&line_syms[..prep.reels]));
     }
 
-    // scatter wins (count over the whole visible window)
     if prep.scatter_id.is_some() {
         let mut sc = 0usize;
         for r in 0..prep.reels {
-            let len = prep.strip_len[r] as usize;
             for row in 0..prep.rows {
-                let pos = (stops[r] as usize + row) % len;
-                if prep.is_scatter[prep.strips[r][pos]] {
+                if prep.is_scatter[grid[r][row]] {
                     sc += 1;
                 }
             }
@@ -69,8 +83,7 @@ pub fn monte_carlo(prep: &Prepared, master_seed: u64, spins: u64) -> Accumulator
         })
 }
 
-/// Same as `monte_carlo`, pinned to a fixed-size Rayon thread pool. Used to prove that the result
-/// is identical regardless of thread count (determinism / thread-independence).
+/// Same as `monte_carlo`, pinned to a fixed-size Rayon thread pool (proves thread-independence).
 pub fn monte_carlo_threads(prep: &Prepared, master_seed: u64, spins: u64, threads: usize) -> Accumulator {
     let pool = rayon::ThreadPoolBuilder::new()
         .num_threads(threads)

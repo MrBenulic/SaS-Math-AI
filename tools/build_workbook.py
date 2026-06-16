@@ -97,6 +97,7 @@ SHEETS = {
             ["v0.2.0-beta.1", "beta", "2026-06-16", "M1 core-math engine: namespaced RNG, integer accounting, exact+MC, CLI; 6 tests green (~19M spins/s)", "last stable = v0.1.0; git checkout v0.1.0"],
             ["v0.2.0-beta.2", "beta", "2026-06-16", "M1 cont.: exact capped enumeration (cap-erosion) + weight-reels; provenance-labeled; 9 tests green", "last stable = v0.1.0; git checkout v0.1.0"],
             ["v0.3.0-beta.1", "beta", "2026-06-16", "M2 auto-tuner: ES weight-tuning to target RTP + realize/re-verify; gate PASS 139%->96% line game; 13 tests green", "last stable = v0.1.0; git checkout v0.1.0"],
+            ["v0.3.0-beta.2", "beta", "2026-06-16", "M2 finished: scatter-consistent (independent-cell) + multi-objective (RTP+vol+hit); scatter re-verify delta 5.8%->0.3%; 16 tests green", "last stable = v0.1.0; git checkout v0.1.0"],
         ],
     },
 }
