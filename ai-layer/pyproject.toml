@@ -11,7 +11,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest"]
+dev = ["pytest", "jsonschema"]  # jsonschema: ADR-004 schema-conformance tests
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

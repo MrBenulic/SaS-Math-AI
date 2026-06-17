@@ -253,6 +253,17 @@ git checkout beta                             # do new work on beta, never direc
   end to end: describe (AI or rule) → simulate → tune → bind art → **publish a fingerprinted package**.
   **Next (non-cert, optional):** scale exact capped RTP (rank 6), schema→TS codegen, PyO3, Playwright
   E2E. **Blocking stable:** certified-game parity sheet (ADR-010) — owner supplying ~late June 2026.
+- **2026-06-16 (ADR-004 schema conformance)** — Added `ai-layer/tests/test_schema_conformance.py`
+  (jsonschema, added to dev deps): validates EVERY `core-math/examples/*.json` config + the
+  Pydantic-built + rule-translator output against `schema/game-config.schema.json` — catching
+  schema↔model↔engine drift (the ADR-004 anti-drift guarantee) without needing codegen tooling.
+  **44 Python tests** (+15). Tagged `v0.4.0-beta.13`. **Non-cert roadmap is now exhausted of safe,
+  self-contained work.** Remaining items each need a decision or the cert sheet: (a) scale exact
+  capped RTP (rank 6) — risky to do without the certified sheet to validate (could corrupt a cert
+  number); (b) full schema→TS/Pydantic CODEGEN replacing hand-written models (refactor; the
+  conformance test already guards the risk); (c) PyO3 native bindings (ADR-007, perf infra — the JSON
+  bridge works); (d) Playwright E2E (heavy browser install; preview-tool verification already covers
+  it). **Blocking stable:** certified-game parity (ADR-010), owner supplying ~late June 2026.
 
 ---
 
