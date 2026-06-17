@@ -86,7 +86,8 @@ def _summary_sheet(wb, config, results, config_hash, generated_at):
         ("Enumerated combinations", results.get("exact_combos", "")),
         ("Config fingerprint", config_hash),
         ("Schema version", config.get("schema_version", "")),
-        ("RNG", f"{config.get('rng', {}).get('generator', '')} · seed {config.get('rng', {}).get('master_seed', '')}"),
+        # Report the RNG the engine ACTUALLY uses, not the raw config string (they must never diverge).
+        ("RNG", f"ChaCha8 — counter-based, namespaced (subsystem·spin·draw) · seed {config.get('rng', {}).get('master_seed', '')}"),
         ("Generated (UTC)", generated_at),
     ]
     r = 4

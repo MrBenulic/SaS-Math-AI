@@ -141,10 +141,10 @@
       "required": ["generator", "master_seed"],
       "properties": {
         "generator": {
-          "description": "Counter-based, namespaced (ADR-003). Never a sequential/LCG generator.",
+          "description": "Counter-based, namespaced RNG (ADR-003). Only 'chacha' (ChaCha8) is implemented; the engine rejects anything else rather than silently substituting.",
           "type": "string",
-          "enum": ["philox", "threefry", "chacha"],
-          "default": "philox"
+          "enum": ["chacha"],
+          "default": "chacha"
         },
         "master_seed": { "type": "integer", "minimum": 0 }
       }

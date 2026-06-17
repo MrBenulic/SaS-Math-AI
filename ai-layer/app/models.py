@@ -58,7 +58,7 @@ class LineEval(str, Enum):
 
 
 class RngConfig(BaseModel):
-    generator: Literal["philox", "threefry", "chacha"] = "chacha"
+    generator: Literal["chacha"] = "chacha"  # only ChaCha8 is implemented (see engine rng.rs)
     master_seed: int = Field(default=0, ge=0)
 
 

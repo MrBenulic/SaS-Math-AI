@@ -224,6 +224,16 @@ fn rejects_empty_paylines_for_line_game() {
 }
 
 #[test]
+fn rejects_non_chacha_generator() {
+    // Only ChaCha8 is implemented; a 'philox' config must be rejected, not silently run as chacha
+    // and then mislabeled in the math sheet.
+    assert!(
+        cfg_json(&with(SCATTER_CFG, "\"generator\":\"chacha\"", "\"generator\":\"philox\"")).is_err(),
+        "non-chacha RNG generator must be rejected"
+    );
+}
+
+#[test]
 fn rejects_reel_weight_sum_over_u32() {
     let json = r#"{
       "schema_version":"0.1.0",

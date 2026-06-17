@@ -103,6 +103,14 @@ impl Prepared {
         if !cfg.max_win.cap_x.is_finite() || cfg.max_win.cap_x <= 0.0 {
             return Err(format!("max_win.cap_x must be finite and > 0, got {}", cfg.max_win.cap_x));
         }
+        // Only ChaCha8 is implemented (rng.rs). Reject any other generator rather than silently
+        // running ChaCha8 and mislabeling it (the cert artifact must state the RNG that actually ran).
+        if cfg.rng.generator != "chacha" {
+            return Err(format!(
+                "rng.generator '{}' is not supported; only 'chacha' (ChaCha8 counter-RNG) is implemented",
+                cfg.rng.generator
+            ));
+        }
 
         let n_symbols = cfg.symbols.iter().map(|s| s.id).max().map(|m| m + 1).unwrap_or(0);
         let max_count = reels * rows;

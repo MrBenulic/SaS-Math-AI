@@ -62,6 +62,7 @@ def test_summary_carries_key_facts():
     assert "95.0000%" in text  # exact RTP rendered
     assert "sha256:abc123" in text  # fingerprint present
     assert "3 / 4" in text  # integer ratio
+    assert "ChaCha8" in text  # RNG reported as the engine's ACTUAL primitive, not the config string
 
 
 def test_paytable_and_distribution_populated():

@@ -309,6 +309,15 @@ git checkout beta                             # do new work on beta, never direc
   95.2955%); browser button → `POST /math-sheet → 200 OK` → download. **49 Python tests** (+3
   mathsheet); frontend tsc + build clean. Tagged `v0.4.0-beta.16`. This is now the tangible thing a
   studio/operator can open and read.
+- **2026-06-17 (RNG honesty fix)** — Owner challenged the RNG. Found the `rng.generator` field offered
+  `philox`/`threefry`/`chacha` (schema **defaulted to philox**) but the engine NEVER reads it — it
+  always uses ChaCha8, and the math sheet printed the raw config string, so a sheet could claim
+  "philox" while ChaCha8 ran. Fixed the dishonesty: schema + Pydantic enum restricted to `["chacha"]`
+  (default chacha); `Prepared::new` now **rejects any non-chacha generator** (no silent substitution);
+  math sheet reports the REAL primitive ("ChaCha8 — counter-based, namespaced (subsystem·spin·draw)").
+  `master_seed` was and is real/used. **38 Rust** (+1 reject) **+ 49 Python** green. Tagged
+  `v0.4.0-beta.17`. (Honest note recorded: the engine/RNG/solver were built before the human-readable
+  Excel deliverable — prioritization miss; the .xlsx now exists, beta.16.)
 
 ---
 
