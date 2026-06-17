@@ -278,6 +278,25 @@ git checkout beta                             # do new work on beta, never direc
   (Rust+Python+frontend, each finding independently verified); fixes + property/fuzz/edge tests land
   next once it reports. **GSAP yes; three.js deferred to a future *meaningful* 3D viz (reels / win-dist
   surface), not chrome.**
+- **2026-06-17 (hardening pass — audit + fixes)** — Ran a 38-agent adversarial audit (each finding
+  independently verified); **20 confirmed bugs** (1 critical, 7 high). Removed stray probe test files
+  the audit agents left (`tests/audit_zzz*.rs`, `probe*_test.rs` — had been swept into beta.14 by a
+  concurrent `git add -A`). **Fixed:** (critical) solver closed-form ignored ways_243 → added
+  `ways_rtp` so ways games tune correctly + agree with exact; (high) engine validations in
+  `Prepared::new` — reject bet_units=0, cap_x≤0/non-finite (was: negative cap silently capped every
+  spin to 0), reel weight-sum > u32::MAX (was: `as u32` truncation/panic), multiple scatters, empty
+  paylines for line games; scatter `scatter_pay` now guards count≥1 + paytable rejects "0"/count<1
+  key (was: silent RTP inflation); (high) ledger now locked + atomic (temp+os.replace) + preserves a
+  corrupt index instead of overwriting; ways `0/0` line-ratio recorded as null; (high) frontend
+  validate-bind latest-wins seq guard; autoMatch uses exact-stem/word-boundary (no more H1→H10);
+  tune target clamped. (medium) `solve_multi` epsilon-floors zero targets. **Tests added/green:**
+  `core-math/tests/hardening.rs` — 8 regression + a 40-config **fuzz** asserting invariants
+  (exact==MC-when-comparable, capped≤uncapped, cap never exceeded, scalar==traced, determinism,
+  thread-independence, no panics); +2 ledger tests. **37 Rust + 46 Python tests green**; frontend
+  `tsc` + `npm run build` clean; app browser-verified functional (simulate renders). Tagged
+  `v0.4.0-beta.15`. **Deferred (documented, lower-risk/edge):** exact-capped DP scaling (best with the
+  cert sheet), u128 denominator saturation on absurd reel spaces, full schema→codegen, PyO3,
+  Playwright. **Stable still gated only by certified-game parity (ADR-010).**
 
 ---
 

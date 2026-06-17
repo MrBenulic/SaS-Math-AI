@@ -95,6 +95,14 @@ impl Prepared {
         if rows == 0 || rows > MAX_ROWS {
             return Err(format!("rows must be 1..={MAX_ROWS}, got {rows}"));
         }
+        // The engine is the certification authority and must validate even if an upstream schema/
+        // Pydantic check is bypassed (defense in depth).
+        if cfg.game.bet_units == 0 {
+            return Err("game.bet_units must be >= 1 (it is the RTP denominator)".into());
+        }
+        if !cfg.max_win.cap_x.is_finite() || cfg.max_win.cap_x <= 0.0 {
+            return Err(format!("max_win.cap_x must be finite and > 0, got {}", cfg.max_win.cap_x));
+        }
 
         let n_symbols = cfg.symbols.iter().map(|s| s.id).max().map(|m| m + 1).unwrap_or(0);
         let max_count = reels * rows;
@@ -106,6 +114,9 @@ impl Prepared {
             match s.kind {
                 SymbolKind::Wild => is_wild[s.id] = true,
                 SymbolKind::Scatter => {
+                    if scatter_id.is_some() {
+                        return Err("multiple scatter symbols are not supported (single-scatter model)".into());
+                    }
                     is_scatter[s.id] = true;
                     scatter_id = Some(s.id);
                 }
@@ -122,6 +133,9 @@ impl Prepared {
                 let c: usize = count_str
                     .parse()
                     .map_err(|_| format!("paytable count key '{count_str}' is not an integer"))?;
+                if c < 1 {
+                    return Err(format!("paytable count key '{count_str}' must be >= 1 (no pay for 0 matches)"));
+                }
                 if c <= max_count {
                     pays[e.symbol_id][c] = payout;
                 }
@@ -211,6 +225,19 @@ impl Prepared {
             (None, None) => return Err("reels must provide `strips` or `weights`".into()),
         }
 
+        // Reel sampling draws a stop/cell index as a u32 (rng.below), so a reel's size must fit u32.
+        for r in 0..reels {
+            if reel_size[r] == 0 {
+                return Err(format!("reel {r} has zero size"));
+            }
+            if reel_size[r] > u32::MAX as u64 {
+                return Err(format!(
+                    "reel {r} size {} exceeds u32::MAX — reel sampling is 32-bit",
+                    reel_size[r]
+                ));
+            }
+        }
+
         for (r, line) in cfg.paylines.iter().enumerate() {
             if line.len() != reels {
                 return Err(format!("payline {r} has {} cells, expected {reels}", line.len()));
@@ -219,7 +246,13 @@ impl Prepared {
                 return Err(format!("payline {r} references a row >= rows ({rows})"));
             }
         }
+        // Line/both-ways games pay along paylines; an empty payline set would silently yield 0 line RTP.
+        if cfg.line_eval != LineEval::Ways243 && cfg.paylines.is_empty() {
+            return Err("a line game needs at least one payline".into());
+        }
 
+        // cap_x is validated finite & > 0 above; bet_units >= 1. The product is non-negative; the
+        // u64::MAX sentinel means "effectively no cap" for astronomically large caps.
         let cap_units = {
             let c = cfg.max_win.cap_x * cfg.game.bet_units as f64;
             if c.is_finite() && c < u64::MAX as f64 {
@@ -341,7 +374,7 @@ impl Prepared {
                     pay + self.ltr_run(Self::reversed(line, &mut buf)).2
                 }
             }
-            LineEval::Ways243 => 0, // unreachable: rejected in `Prepared::new`
+            LineEval::Ways243 => 0, // ways games evaluate the whole grid via `ways_pay`, not paylines
         }
     }
 
@@ -370,7 +403,7 @@ impl Prepared {
                     }
                 }
             }
-            LineEval::Ways243 => {} // unreachable: rejected in `Prepared::new`
+            LineEval::Ways243 => {} // ways games use `ways_wins` (whole-grid), not per-payline
         }
         out
     }
@@ -378,8 +411,9 @@ impl Prepared {
     #[inline]
     pub fn scatter_pay(&self, count: usize) -> u64 {
         match self.scatter_id {
-            Some(id) => self.pays[id][count.min(self.max_count)],
-            None => 0,
+            // A pay is only ever earned for >= 1 scatter; never pay on zero (guards a stray "0" key).
+            Some(id) if count >= 1 => self.pays[id][count.min(self.max_count)],
+            _ => 0,
         }
     }
 

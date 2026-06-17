@@ -66,6 +66,10 @@ const configSymbols = (configText: string): ConfigSymbol[] => {
 };
 
 const base = (f: string) => f.split(/[\\/]/).pop()!.toLowerCase();
+const stem = (f: string) => base(f).replace(/\.[^.]+$/, ""); // filename, lowercased, no extension
+
+// Monotonic guard so a slow/stale validate-bind response can't overwrite a newer one.
+let bindSeq = 0;
 
 // Map one asset file to the right renderable field on a symbol binding.
 const assetToBinding = (id: number, f: string): SymbolBinding => {
@@ -80,6 +84,8 @@ const assetToBinding = (id: number, f: string): SymbolBinding => {
 
 // Auto-match: assign each unbound symbol the asset whose file name contains the symbol name.
 // Prefer a Spine skeleton, else any renderable asset.
+// Match a symbol to an asset by EXACT stem or a whole-word boundary — never a bare substring, so
+// "H1" no longer wrongly grabs "H10"/"H11". Skeletons win ties.
 const autoMatch = (
   symbols: ConfigSymbol[],
   assets: string[],
@@ -89,10 +95,17 @@ const autoMatch = (
   for (const sym of symbols) {
     if (next[sym.id]) continue;
     const key = sym.name.toLowerCase();
-    const hits = assets.filter((a) => base(a).includes(key));
-    if (hits.length === 0) continue;
-    const skel = hits.find((a) => /\.(json|skel)$/.test(base(a)));
-    next[sym.id] = skel ?? hits[0];
+    const esc = key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const wb = new RegExp(`(^|[^a-z0-9])${esc}([^a-z0-9]|$)`);
+    const scored = assets
+      .map((a) => {
+        const st = stem(a);
+        const score = st === key ? 3 : wb.test(st) ? 2 : 0;
+        return { a, score, skel: /\.(json|skel)$/.test(base(a)) };
+      })
+      .filter((x) => x.score > 0)
+      .sort((p, q) => q.score - p.score || Number(q.skel) - Number(p.skel));
+    if (scored.length) next[sym.id] = scored[0].a;
   }
   return next;
 };
@@ -179,7 +192,9 @@ export const useStore = create<State>((set, get) => ({
     set({ loading: "tune", error: null });
     try {
       const config = JSON.parse(get().configText);
-      const r = await api.tune(config, get().targetRtp, 120);
+      // Clamp the target before it reaches the solver (the input can hold out-of-range typed values).
+      const target = Math.min(Math.max(get().targetRtp || 0.96, 0.01), 5);
+      const r = await api.tune(config, target, 120);
       set({ tune: r, configText: JSON.stringify(r.tuned_config, null, 2), sim: null, published: null });
     } catch (e) {
       set({ error: "Tune failed: " + msg(e) });
@@ -244,7 +259,9 @@ export const useStore = create<State>((set, get) => ({
         set({ eventTypes });
       }
       const binding = buildBinding(get().configText, get().symbolAsset, get().symbolAnims, eventTypes);
+      const seq = ++bindSeq;
       const report = await api.validateBind(config, binding);
+      if (seq !== bindSeq) return; // a newer validate-bind superseded this response
       set({ bindReport: report, error: null });
     } catch (e) {
       set({ error: "Bind check failed: " + msg(e) });

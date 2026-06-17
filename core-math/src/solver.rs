@@ -112,9 +112,43 @@ pub fn closed_form_rtp(prep: &Prepared, weights: &[Vec<f64>]) -> (f64, f64, f64)
             }
         })
         .collect();
-    let line = line_rtp(prep, &probs);
+    let line = if prep.is_ways() { ways_rtp(prep, &probs) } else { line_rtp(prep, &probs) };
     let scatter = scatter_rtp(prep, &probs);
     (line + scatter, line, scatter)
+}
+
+/// Closed-form 243-ways RTP from per-reel cell probabilities (independent-cell model). Mirrors
+/// `enumerate::ways_rtp_exact` so the solver objective matches re-verification for ways games too.
+fn ways_rtp(prep: &Prepared, probs: &[Vec<f64>]) -> f64 {
+    let rows = prep.rows;
+    let reels = prep.reels;
+    let mut total = 0.0;
+    for s in 0..prep.n_symbols {
+        if prep.is_scatter[s] {
+            continue;
+        }
+        let s_is_wild = prep.is_wild[s];
+        let p: Vec<f64> = (0..reels)
+            .map(|r| {
+                if s_is_wild {
+                    probs[r][s]
+                } else {
+                    let wild: f64 = (0..prep.n_symbols).filter(|&w| prep.is_wild[w]).map(|w| probs[r][w]).sum();
+                    probs[r][s] + wild
+                }
+            })
+            .collect();
+        let mut prod = 1.0; // product of mean counts (rows*p) over reels 0..K-1
+        for k in 1..=reels {
+            prod *= rows as f64 * p[k - 1];
+            let pay = if k <= prep.max_count { prep.pays[s][k] } else { 0 };
+            if pay > 0 {
+                let tail = if k < reels { (1.0 - p[k]).powi(rows as i32) } else { 1.0 };
+                total += pay as f64 * prod * tail;
+            }
+        }
+    }
+    total / prep.bet_units as f64
 }
 
 fn line_rtp(prep: &Prepared, probs: &[Vec<f64>]) -> f64 {
@@ -318,18 +352,20 @@ pub fn solve_multi(prep: &Prepared, base: &GameConfig, targets: &SolveTargets, o
     let (best_x, best_f, evals) = run_es(n, &x_init, opts, |x| {
         let wv = weights_from_x(x);
         let (rtp, _, _) = closed_form_rtp(prep, &wv);
-        let mut loss = ((rtp - targets.rtp) / targets.rtp).powi(2);
+        // Normalize relative error with an epsilon floor so a zero/near-zero target can't make the
+        // loss NaN/Inf (which would corrupt the ES selection).
+        let mut loss = ((rtp - targets.rtp) / targets.rtp.max(1e-9)).powi(2);
         if use_mc {
             let cfg2 = realized_config(base, &wv, EVAL_SCALE);
             if let Ok(p2) = Prepared::new(&cfg2) {
                 let acc = monte_carlo(&p2, opts.crn_seed, opts.eval_spins);
                 if let Some(tv) = targets.volatility {
                     let vol = acc.return_variance(p2.bet_units).sqrt();
-                    loss += opts.w_vol * ((vol - tv) / tv).powi(2);
+                    loss += opts.w_vol * ((vol - tv) / tv.max(1e-9)).powi(2);
                 }
                 if let Some(th) = targets.hit_frequency {
                     let hf = acc.hit_frequency();
-                    loss += opts.w_hit * ((hf - th) / th).powi(2);
+                    loss += opts.w_hit * ((hf - th) / th.max(1e-9)).powi(2);
                 }
             }
         }

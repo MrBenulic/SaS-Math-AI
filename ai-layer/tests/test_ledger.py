@@ -43,3 +43,25 @@ def test_distinct_hashes_accumulate(tmp_path):
 
 def test_read_index_empty_when_absent(tmp_path):
     assert ledger.read_index(tmp_path / "nope") == []
+
+
+def test_ways_ratio_is_none(tmp_path):
+    art = {
+        "config_hash": "sha256:ways",
+        "schema_version": "0.1.0",
+        "config": {"game": {"name": "Ways"}},
+        "results": {"exact_rtp": 3.6, "exact_line_ratio_num": "0", "exact_line_ratio_den": "0"},
+    }
+    entry = ledger.record(art, tmp_path)
+    assert entry["exact_line_ratio"] is None  # ways RTP has no integer ratio
+
+
+def test_corrupt_index_is_preserved_not_overwritten(tmp_path):
+    # seed an existing (corrupt) index.json
+    (tmp_path / "index.json").write_text("{ this is not valid json ][")
+    ledger.record(_artifact("sha256:new", "New", 0.95), tmp_path)
+    # the corrupt file is backed up, not silently discarded
+    assert (tmp_path / "index.json.corrupt").exists()
+    # the new index is valid and contains the new entry
+    idx = ledger.read_index(tmp_path)
+    assert [e["config_hash"] for e in idx] == ["sha256:new"]
