@@ -12,13 +12,12 @@ B2B SaaS **AI-Driven Slot Math Generation & Tuning Engine**: NL/UI → validated
 deterministic **exact + Monte Carlo** math engine → auto-tuning solver → GLI/BMM certification export.
 
 ## 2. Current status
-- **Date:** 2026-06-16
-- **Version / milestone:** `v0.4.0-beta.2` — **M3 complete (backend + frontend)** on `beta`: FastAPI ai-layer (provider-agnostic translator) + a **Next.js "Slot Studio"** UI (Tailwind/Zustand/Monaco) + a Rust JSON engine bridge. Full **prompt → JSON → simulate → tune works in the browser**. M1 + M2 complete.
-- **Branch:** `beta` (active work). `main` holds stable `v0.1.0`.
-- **Latest stable tag:** `v0.1.0` · **Latest beta tag:** `v0.4.0-beta.2`
-- **Repo (private):** [`MrBenulic/SaS-Math-AI`](https://github.com/MrBenulic/SaS-Math-AI)
-- **Local path:** `~/Desktop/SaS-Math AI app`
-- **Verified (16 Rust + 6 Python tests green; browser-verified):** **M3 gate IN BROWSER** — prompt "5x3, 20 lines, 96% RTP, medium vol, wild+scatter" → Translate → Simulate (149.19%) → Auto-tune → **96.00%** (realize-delta 0.01%, 1680 evals), via Next.js UI → FastAPI → Rust engine. Run: build `core-math` engine, `ai-layer` uvicorn (:8000), `frontend` `npm run dev` (:3000).
+- **Date:** 2026-06-17
+- **Version:** `v0.4.0-beta.17` on `beta`. **M1 engine + M2 solver + M3 (ai-layer + Slot Studio) DONE.** `main` holds stable `v0.1.0`.
+- **HONEST state (read this):** the engine does **BASE-GAME math ONLY** — lines / both-ways / 243-ways, scatter, single wild, max-win cap — with EXACT enumeration + deterministic Monte-Carlo + an ES auto-tuner. Plus: the Slot Studio UI, a SHA-256 config **fingerprint + ledger**, **art-binding** export (`presentation.bind.json`), a real **Excel math sheet** (`POST /math-sheet`), and a real **Groq LLM** translator (key in gitignored `ai-layer/.env`). **NOT built: free spins / bonus rounds, multipliers, expanding/sticky wilds, cascades, hold-and-spin** — the config `features` array is parsed but **INERT**. That is **M4 = the current mission**. **NOT certified** (ADR-010 parity needs an external certified-game sheet, expected from the owner).
+- **Tests:** **38 Rust + 49 Python green**; frontend `tsc` + `npm run build` clean.
+- **Repo (private):** [`MrBenulic/SaS-Math-AI`](https://github.com/MrBenulic/SaS-Math-AI) · **Local:** `~/Desktop/SaS-Math AI app`
+- **Run:** engine `cd core-math && cargo build --release --bin engine`; ai-layer `cd ai-layer && .venv/bin/uvicorn app.main:app` (:8000); frontend `cd frontend && npm run dev` (:3000).
 
 ## 3. How to resume
 ```bash
@@ -57,7 +56,14 @@ git checkout beta                             # do new work on beta, never direc
   engine.rs`) + a **Next.js "Slot Studio"** (Tailwind/Zustand/Monaco). prompt→JSON→simulate→tune works
   in the browser (16 Rust + 6 Python tests; browser-verified). **Remaining:** schema→TS codegen;
   Playwright E2E; Postgres/SQLite persistence; real LLM provider wiring.
-- ⏳ v1.0.0 M4 advanced mechanics + GLI/BMM exporter.
+- 🟦 **v0.4.0 M3 polish** (beta.3→beta.17): event stream / replay, art-binding sidecar + Studio UI +
+  export, config fingerprint + published-artifact + ledger, solver feasibility, exact `ways_243`,
+  real **Groq LLM** translator + AI toggle, **Excel math-sheet exporter** (`/math-sheet`), a 38-agent
+  hardening pass (20 bugs fixed + fuzz/regression tests), RNG honesty (ChaCha8 only). 38 Rust + 49 Py.
+- ⏳ **v1.0.0 M4 — advanced mechanics + GLI/BMM exporter = CURRENT MISSION** (build in the fresh chat):
+  free spins/bonus FIRST, then multipliers, expanding/sticky wilds, cascades, hold-and-spin, then the
+  GLI/BMM certification exporter. Full sequenced plan is in the §10 fresh-chat prompt. Stable v1.0.0
+  also needs the external certified-game parity test (ADR-010).
 
 ## 6. Open decisions / TODO
 - **LLM provider** for Module 2 — *deferred* (decide in M3). Code a provider-agnostic interface.
@@ -318,6 +324,14 @@ git checkout beta                             # do new work on beta, never direc
   `master_seed` was and is real/used. **38 Rust** (+1 reject) **+ 49 Python** green. Tagged
   `v0.4.0-beta.17`. (Honest note recorded: the engine/RNG/solver were built before the human-readable
   Excel deliverable — prioritization miss; the .xlsx now exists, beta.16.)
+- **2026-06-17 (migrate to fresh chat for M4)** — Owner (rightly) called out that the app is BASE-GAME
+  ONLY: no free spins/bonus/multipliers/cascades/hold-spin (the `features` array is inert) and isn't
+  certified. Decision: don't build the big M4 milestone in a depleted context — **migrate to a fresh
+  chat** with a full sequenced M4 plan. Rewrote §2 (honest state), §5 (roadmap), and §10 (fresh-chat
+  prompt now carries the complete M4 build order: scaffolding → FREE SPINS first → multipliers →
+  expanding/sticky wilds → cascades → hold-and-spin → GLI/BMM exporter, with the ADR guardrails and
+  acceptance criteria). Nothing new built this session beyond beta.17. **Next chat: execute M4, free
+  spins first; ship each mechanic complete + tested + committed.**
 
 ---
 
@@ -325,31 +339,57 @@ git checkout beta                             # do new work on beta, never direc
 
 ```
 We are continuing the SaS-Math AI project (B2B slot-math generation & tuning engine).
-Local path: ~/Desktop/SaS-Math AI app  (private GitHub repo MrBenulic/SaS-Math-AI).
+Local: ~/Desktop/SaS-Math AI app  (private repo MrBenulic/SaS-Math-AI). Work on `beta`.
 
-FIRST: read reboot.md, CLAUDE.md, and docs/design-decisions.md in that folder — they hold the live
-status and the locked engineering decisions (ADRs). Then read docs/roadmap.md for what's next.
+FIRST read: reboot.md (this file — live status + full session log), CLAUDE.md, docs/design-decisions.md
+(ADRs), docs/roadmap.md, docs/product-strategy.md.
 
-Current state: M1 engine + M2 solver + M3 (ai-layer + Next.js frontend) are BUILT on `beta` (tag
-v0.4.0-beta.2). Rust core: exact closed-form + capped enumeration, independent-cell weight-reels,
-deterministic MC, multi-objective ES auto-tuner (RTP + volatility + hit-frequency). M3: a FastAPI
-ai-layer (provider-agnostic translator) + a Next.js "Slot Studio" UI (Tailwind/Zustand/Monaco) calling
-the Rust engine via a JSON bridge (`bin/engine.rs`) — full prompt→JSON→simulate→tune works IN THE
-BROWSER. 16 Rust + 6 Python tests green. v0.1.0 Foundation is on `main`. We work on `beta` and promote
-to `main` (tag vX.Y.Z) only after a milestone gate passes; we cut beta pre-releases as vX.Y.Z-beta.N.
-Always tag a stable point before risky changes.
+STATE (v0.4.0-beta.17): M1 engine + M2 solver + M3 (FastAPI ai-layer + Next.js "Slot Studio") are DONE
+and the BASE-GAME loop works in the browser: describe (rule parser OR real Groq LLM) -> validated JSON
+config -> EXACT + Monte-Carlo math -> ES auto-tune -> art-binding -> publish (SHA-256 fingerprint +
+ledger) -> DOWNLOAD an Excel math sheet (POST /math-sheet). 38 Rust + 49 Python tests green.
 
-Non-negotiables (see CLAUDE.md / ADRs): integer/u128 money accounting; counter-based NAMESPACED RNG
-(subsystem, spin, draw); the JSON schema is the single source of truth for TS + Pydantic + Rust serde;
-exact combinatorial math is the certification source of truth and MC only validates the harness +
-non-enumerable features; max-win cap is modeled inside the math; the LLM never writes code.
+HONEST LIMITATION (the reason for this mission): the engine is BASE-GAME ONLY — lines/both-ways/
+243-ways, scatter, single wild, max-win cap. It has NO free spins, bonus rounds, multipliers,
+expanding/sticky wilds, cascades, or hold-and-spin. The config `features` array is parsed but INERT.
+RNG namespaces NS_FEATURE=2 / NS_BONUS_PICK=3 exist in core-math/src/rng.rs but are unused. It is NOT
+certified. A slot is not sellable without free spins/bonus, so that is step 1.
 
-Next: M3 polish — schema→TS codegen, Playwright E2E, Postgres/SQLite persistence, and wiring a real LLM
-provider into the translator stub; OR start M4 — advanced mechanics (cascades, expanding wilds,
-multipliers) + the GLI/BMM compliance exporter. (M3 ai-layer + Next.js Slot Studio are DONE and
-browser-verified.) Other open: M2 polish (CMA-ES covariance, PyO3); stable needs external CERTIFIED-game
-parity. To run the ai-layer: `cd ai-layer && python3 -m venv .venv &&
-.venv/bin/pip install -e '.[dev]'`, build `core-math` engine (`cargo build --release --bin engine`),
-then `.venv/bin/python -m pytest -q` or `.venv/bin/uvicorn app.main:app`. Do work on `beta`; keep
-reboot.md + the Excel tracker current.
+YOUR MISSION = M4: turn this into a real slot engine — advanced mechanics + the GLI/BMM exporter.
+NON-NEGOTIABLES (CLAUDE.md / ADRs): integer/u128 money (no float in the money path); counter-based
+NAMESPACED RNG (subsystem, spin, draw) — use NS_FEATURE/NS_BONUS_PICK for bonus streams; EXACT
+combinatorial math is the certification source of truth, Monte-Carlo ONLY for genuinely non-enumerable
+parts and ALWAYS reported with a confidence interval; declared+certified recursion caps for retriggers/
+feature-buy (ADR-011); ONE JSON schema -> TS + Pydantic + Rust serde; max-win cap inside the math; the
+LLM never writes code (it only emits a constrained intent). ONLY ChaCha8 is implemented (Prepared::new
+rejects any other rng.generator). Tag beta snapshots vX.Y.Z-beta.N; commit + run tests
+(`cd core-math && cargo test --release`; `cd ai-layer && .venv/bin/python -m pytest -q`) after EACH
+mechanic; keep reboot.md current. NEVER commit secrets (.env and /API/ are gitignored; a Groq key is
+in ai-layer/.env).
+
+M4 BUILD ORDER (ship each one COMPLETE + tested + committed; do not leave half-built scaffolding):
+0. SCAFFOLDING: turn config `features` into a typed FeatureSpec (Rust serde enum + Pydantic + schema,
+   versioned); add feature EVENTS to RoundOutcome (core-math/src/outcome.rs) so a trace shows the
+   free-spin/retrigger/cascade steps; add RTP-by-feature accounting (base vs each feature), each number
+   labeled exact vs MC-with-CI.
+1. FREE SPINS (FIRST): scatter-triggered N free spins on the base or a separate reel set, with
+   RETRIGGERS up to a DECLARED cap (ADR-011). RTP = exact base + P(trigger)*E[free-spin winnings].
+   Free spins w/ retriggers are NOT exactly enumerable -> Monte-Carlo WITH a CI on the bonus stream
+   (NS_FEATURE); optionally a Markov absorbing-state model for the exact retrigger expectation.
+   ACCEPTANCE: total RTP = base + measured FS contribution and the MC CI contains it; deterministic +
+   thread-independent; recursion cap enforced; RoundOutcome emits the FS sequence; the solver can tune
+   a free-spins game; tests (incl. a hand/Markov cross-check) green.
+2. MULTIPLIERS (global / free-spin / progressive). 3. EXPANDING & STICKY WILDS. 4. CASCADES/TUMBLES
+   (MC, declared cascade cap, emit steps). 5. HOLD-AND-SPIN / respin (Markov or MC, declared respin cap).
+6. GLI/BMM CERTIFICATION EXPORTER — extend ai-layer/app/mathsheet.py (+ a PDF): per-payline hit
+   frequency, RTP-by-feature, exact combinatorics, reel-strip breakdowns, MC metrics ± CI, declared
+   recursion caps, exact-vs-MC provenance per number, the config fingerprint. This is the M4 deliverable
+   that pairs with the ADR-010 parity test.
+
+CONTEXT: the owner runs an online-slot ANIMATION studio (Spine/atlas/spritesheet exports); SaS-Math is
+the missing certified math; the moat is art + certified math as one package. The owner is non-technical
+in slot math and (rightly) wants COMPLETE, working, tested features shipped — not partial scaffolding
+presented as done; be blunt and accurate about what is/ isn't built. When the owner supplies a certified
+game math sheet, run the ADR-010 parity test to promote toward stable v1.0.0; otherwise the owner will
+have a mathematician review the output. Run app: ai-layer uvicorn :8000 + frontend npm run dev :3000.
 ```
