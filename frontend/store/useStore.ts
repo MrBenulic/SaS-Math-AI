@@ -13,6 +13,7 @@ interface State {
   sim: SimResult | null;
   tune: TuneResult | null;
   targetRtp: number;
+  useAI: boolean; // use the Groq LLM translator instead of the rule-based one
   loading: "translate" | "simulate" | "tune" | null;
   error: string | null;
 
@@ -28,6 +29,7 @@ interface State {
   setPrompt: (s: string) => void;
   setConfigText: (s: string) => void;
   setTargetRtp: (n: number) => void;
+  setUseAI: (b: boolean) => void;
   doTranslate: () => Promise<void>;
   doSimulate: () => Promise<void>;
   doTune: () => Promise<void>;
@@ -117,6 +119,7 @@ export const useStore = create<State>((set, get) => ({
   sim: null,
   tune: null,
   targetRtp: 0.96,
+  useAI: false,
   loading: null,
   error: null,
 
@@ -131,11 +134,12 @@ export const useStore = create<State>((set, get) => ({
   setPrompt: (s) => set({ prompt: s }),
   setConfigText: (s) => set({ configText: s }),
   setTargetRtp: (n) => set({ targetRtp: n }),
+  setUseAI: (b) => set({ useAI: b }),
 
   doTranslate: async () => {
     set({ loading: "translate", error: null });
     try {
-      const r = await api.translate(get().prompt);
+      const r = await api.translate(get().prompt, get().useAI ? "groq" : "rule");
       set({ configText: JSON.stringify(r.config, null, 2), sim: null, tune: null });
       if (r.targets?.rtp) set({ targetRtp: r.targets.rtp });
     } catch (e) {

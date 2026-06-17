@@ -50,12 +50,23 @@ export default function Home() {
               onChange={(e) => s.setPrompt(e.target.value)}
               placeholder="e.g. 5x3 slot, 20 paylines, 96% RTP, high volatility, with wild and scatter"
             />
+            <label className="flex items-center gap-2 text-xs text-slate-400">
+              <input
+                id="use-ai"
+                type="checkbox"
+                checked={s.useAI}
+                onChange={(e) => s.setUseAI(e.target.checked)}
+                className="accent-indigo-500"
+              />
+              ✨ Use AI (Groq) — natural-language understanding{" "}
+              <span className="text-slate-600">(off = fast rule-based parser)</span>
+            </label>
             <button
               onClick={s.doTranslate}
               disabled={busy}
               className="w-full rounded-lg bg-indigo-600 py-2 text-sm font-semibold hover:bg-indigo-500 disabled:opacity-50"
             >
-              Translate → config
+              {s.useAI ? "Translate with AI → config" : "Translate → config"}
             </button>
           </div>
 

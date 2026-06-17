@@ -5,6 +5,8 @@
 *.pem
 *.key
 secrets/
+# Local key drop (Groq API key Word doc lives here — never commit)
+/API/
 
 # ---- Rust (core-math, solver) ----
 target/

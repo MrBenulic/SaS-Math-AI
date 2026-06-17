@@ -100,7 +100,13 @@ def translate(r: TranslateReq) -> dict[str, Any]:
         cfg = get_translator(r.provider).translate(r.prompt)
     except NotImplementedError as e:
         raise HTTPException(status_code=501, detail=str(e))
-    return {"config": cfg.model_dump(), "targets": cfg.targets.model_dump() if cfg.targets else None}
+    except RuntimeError as e:  # provider/network failure — surface cleanly so the UI can fall back
+        raise HTTPException(status_code=502, detail=str(e))
+    return {
+        "config": cfg.model_dump(),
+        "targets": cfg.targets.model_dump() if cfg.targets else None,
+        "provider": r.provider,
+    }
 
 
 @app.post("/validate")

@@ -201,6 +201,21 @@ git checkout beta                             # do new work on beta, never direc
   recorded as a reference (the certified sheet ~late June 2026 is still the ADR-010 parity gate).
   **Next (no LLM/cert needed):** fold the engine's exact integer rational into the published artifact;
   `index.json` ledger of published games; typed `NoFeasibleSolution`; then exact `ways_243`.
+- **2026-06-16 (real LLM — Groq wired)** — Owner supplied a **Groq API key** (in `API/Api_Grok.docx`,
+  extracted to gitignored `ai-layer/.env`; `/API/` added to `.gitignore` so the key doc is never
+  committed). Wired a real **GroqTranslator** (`ai-layer/app/translator.py`): ADR-008-correct — the
+  LLM (Groq `llama-3.3-70b-versatile`, JSON mode) emits ONLY a constrained `GameIntent`
+  (grid/lines/rtp/volatility/wild/scatter/both-ways); our `build_from_intent` clamps it and
+  `build_base_config` builds the validated config from the fixed library; math stays in Rust. Key read
+  from env or `ai-layer/.env` (never logged). `httpx` promoted to a main dep; `/translate` returns 502
+  on provider failure so the UI can fall back. Frontend: a **"✨ Use AI (Groq)"** toggle (store `useAI`
+  → provider `groq|rule`). **Verified live**: backend call parsed "6x4, 40 lines, 94% RTP, high vol,
+  both ways" exactly; browser toggle parsed a WORDS-ONLY prompt ("seven reels by two rows, thirty
+  paylines, ninety-four percent, low vol, no scatter") → 7x2 / 30 lines / no SCATTER / rtp 0.94 / vol
+  low — things the rule-based regex cannot do. **23 Python tests** (+5 translator, incl. a mocked-Groq
+  test) + frontend `tsc` clean, no console errors. To be tagged `v0.4.0-beta.8`. Default translator is
+  still rule-based (no key needed); Groq is opt-in. **Next:** richer LLM intent (cap_x, grid presets),
+  exact integer rational in the published artifact, `index.json` ledger, typed `NoFeasibleSolution`.
 
 ---
 

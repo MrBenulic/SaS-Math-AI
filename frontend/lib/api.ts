@@ -98,7 +98,8 @@ export interface BindReport {
 
 export const api = {
   health: () => fetch(BASE + "/health").then((r) => r.json()),
-  translate: (prompt: string) => post<TranslateResult>("/translate", { prompt }),
+  translate: (prompt: string, provider: "rule" | "groq" = "rule") =>
+    post<TranslateResult>("/translate", { prompt, provider }),
   simulate: (config: unknown, spins = 500_000) => post<SimResult>("/simulate", { config, spins }),
   tune: (config: unknown, target_rtp: number, generations = 120) =>
     post<TuneResult>("/tune", { config, target_rtp, generations }),
