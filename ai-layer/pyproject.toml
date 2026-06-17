@@ -8,6 +8,7 @@ dependencies = [
     "uvicorn[standard]",
     "pydantic>=2",
     "httpx",  # Groq LLM adapter (translator.py) + test client
+    "openpyxl",  # Excel math-sheet exporter (mathsheet.py)
 ]
 
 [project.optional-dependencies]

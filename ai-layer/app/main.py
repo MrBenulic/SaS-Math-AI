@@ -7,13 +7,14 @@ from __future__ import annotations
 
 from typing import Any, Optional
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, ValidationError
 
 from . import engine as eng
 from . import ledger
 from .artifact import build_published_artifact, config_hash
+from .mathsheet import build_math_sheet_xlsx
 from .binding import EVENT_TYPES, PresentationBind, validate_binding
 from .mechanics import VOLATILITY_PRESETS
 from .models import GameConfig
@@ -104,6 +105,23 @@ def publish(r: PublishReq) -> dict[str, Any]:
 def get_ledger() -> dict[str, Any]:
     """The compact index of all published artifacts (content-addressed by config fingerprint)."""
     return {"published": ledger.read_index()}
+
+
+@app.post("/math-sheet")
+def math_sheet(r: PublishReq) -> Response:
+    """The human-readable Excel math sheet (Summary · Symbols · Reels · Paytable · Win distribution)."""
+    try:
+        cfg = r.config.model_dump(mode="json")  # JSON mode -> enums render as plain strings
+        results = eng.simulate(cfg, r.spins)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    xlsx = build_math_sheet_xlsx(cfg, results, config_hash(r.config))
+    name = (cfg.get("game", {}).get("name") or "game").replace(" ", "_")[:40] or "game"
+    return Response(
+        content=xlsx,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{name}_math_sheet.xlsx"'},
+    )
 
 
 @app.post("/translate")

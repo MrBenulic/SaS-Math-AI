@@ -64,6 +64,14 @@ struct SimResponse {
     max_win_x: f64,
     spins: u64,
     throughput_mps: f64,
+    win_distribution: Vec<Bucket>,
+}
+
+#[derive(Serialize)]
+struct Bucket {
+    label: String,
+    count: String, // u128 count as decimal string
+    probability: f64,
 }
 
 #[derive(Serialize)]
@@ -127,6 +135,14 @@ fn main() {
             let t = Instant::now();
             let acc = monte_carlo(&prep, config.rng.master_seed, spins);
             let secs = t.elapsed().as_secs_f64();
+            let spins_f = (acc.spins.max(1)) as f64;
+            let win_distribution: Vec<Bucket> = (0..sas_math_core::stats::NB)
+                .map(|i| Bucket {
+                    label: sas_math_core::stats::bucket_label(i),
+                    count: acc.hist[i].to_string(),
+                    probability: acc.hist[i] as f64 / spins_f,
+                })
+                .collect();
             let resp = SimResponse {
                 exact_rtp: exact.rtp,
                 line_rtp: exact.line_rtp,
@@ -143,6 +159,7 @@ fn main() {
                 max_win_x: acc.max_win as f64 / prep.bet_units as f64,
                 spins,
                 throughput_mps: if secs > 0.0 { spins as f64 / secs / 1e6 } else { 0.0 },
+                win_distribution,
             };
             println!("{}", serde_json::to_string(&resp).unwrap());
         }

@@ -210,6 +210,14 @@ export default function Home() {
             >
               Publish — fingerprint &amp; record
             </button>
+            <button
+              id="mathsheet-btn"
+              onClick={s.doDownloadSheet}
+              disabled={busy || !s.configText}
+              className="btn btn-soft w-full py-2 text-sm"
+            >
+              ⬇ Download math sheet (.xlsx)
+            </button>
             {s.published && (
               <div
                 id="publish-result"

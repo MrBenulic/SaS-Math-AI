@@ -127,4 +127,22 @@ export const api = {
     fetch(BASE + "/ledger").then((r) => r.json()) as Promise<{
       published: { config_hash: string; name: string | null; exact_rtp: number }[];
     }>,
+  mathSheet: async (config: unknown, spins = 200_000): Promise<Blob> => {
+    const res = await fetch(BASE + "/math-sheet", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ config, spins }),
+    });
+    if (!res.ok) {
+      let detail = `${res.status} ${res.statusText}`;
+      try {
+        const j = await res.json();
+        if (j?.detail) detail = typeof j.detail === "string" ? j.detail : JSON.stringify(j.detail);
+      } catch {
+        /* keep status text */
+      }
+      throw new Error(detail);
+    }
+    return res.blob();
+  },
 };

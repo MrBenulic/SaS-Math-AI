@@ -297,6 +297,18 @@ git checkout beta                             # do new work on beta, never direc
   `v0.4.0-beta.15`. **Deferred (documented, lower-risk/edge):** exact-capped DP scaling (best with the
   cert sheet), u128 denominator saturation on absurd reel spaces, full schema→codegen, PyO3,
   Playwright. **Stable still gated only by certified-game parity (ADR-010).**
+- **2026-06-17 (Excel math sheet — the deliverable)** — Owner asked for "an output like an Excel file
+  like mathematicians deliver". Built it (first slice of the M4 GLI/BMM exporter; no cert sheet
+  needed): engine `SimResponse` now exposes the **win-distribution histogram** (14 bands from the
+  ADR-012 accumulator); `ai-layer/app/mathsheet.py` (`build_math_sheet_xlsx`, openpyxl) produces a
+  styled multi-sheet **.xlsx**: Summary (game, exact RTP + line/scatter/capped, MC±CI, volatility, hit
+  freq, max win, integer line-ratio, fingerprint, RNG, generated-at), Symbols, Reels (strips or
+  weights+probabilities), Paytable matrix, Win distribution. Endpoint `POST /math-sheet` returns the
+  file; Studio step 5 has a **"⬇ Download math sheet (.xlsx)"** button. openpyxl added to deps.
+  **Verified**: endpoint returns a valid 9 KB 5-sheet workbook (reopened with openpyxl; Exact RTP
+  95.2955%); browser button → `POST /math-sheet → 200 OK` → download. **49 Python tests** (+3
+  mathsheet); frontend tsc + build clean. Tagged `v0.4.0-beta.16`. This is now the tangible thing a
+  studio/operator can open and read.
 
 ---
 

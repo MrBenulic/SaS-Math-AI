@@ -24,7 +24,7 @@ interface State {
   useAI: boolean; // use the Groq LLM translator instead of the rule-based one
   published: PublishResult | null;
   ledgerCount: number | null;
-  loading: "translate" | "simulate" | "tune" | "publish" | null;
+  loading: "translate" | "simulate" | "tune" | "publish" | "sheet" | null;
   error: string | null;
 
   // Art binding (the art↔math bridge)
@@ -44,6 +44,7 @@ interface State {
   doSimulate: () => Promise<void>;
   doTune: () => Promise<void>;
   doPublish: () => Promise<void>;
+  doDownloadSheet: () => Promise<void>;
 
   setAssetText: (s: string) => void;
   loadAssetNames: (names: string[]) => Promise<void>;
@@ -212,6 +213,27 @@ export const useStore = create<State>((set, get) => ({
       set({ published: r, ledgerCount: led.published.length });
     } catch (e) {
       set({ error: "Publish failed: " + msg(e) });
+    } finally {
+      set({ loading: null });
+    }
+  },
+
+  doDownloadSheet: async () => {
+    set({ loading: "sheet", error: null });
+    try {
+      const config = JSON.parse(get().configText);
+      const blob = await api.mathSheet(config, 200_000);
+      const name = String(config?.game?.name || "game").replace(/\s+/g, "_").slice(0, 40) || "game";
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${name}_math_sheet.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      set({ error: "Math sheet failed: " + msg(e) });
     } finally {
       set({ loading: null });
     }
