@@ -187,6 +187,20 @@ git checkout beta                             # do new work on beta, never direc
   expose the engine's exact integer rational into the published artifact; `index.json` ledger; typed
   `NoFeasibleSolution`; then exact `ways_243` with hand-verified tests. Run: ai-layer uvicorn :8000 +
   `frontend npm run dev` :3000 (engine only needed for simulate/tune/publish, not bind).
+- **2026-06-16 (richer bindings + export)** — Extended the Slot Studio binding panel: per-symbol
+  **idle/land/win animation + sound** inputs (collapsible per row) and an **Export
+  presentation.bind.json** button that assembles the full binding, **pins the SHA-256
+  `targets_config_hash`** (via `POST /config-hash`), downloads the file, and shows a collapsible JSON
+  preview. Store refactored to a shared `buildBinding()` (used by validate + export) + `symbolAnims`
+  + `doExportBind`. **Browser-verified** (preview tools): set WILD `win_anim=wild_explode`, exported →
+  "7 symbol bindings · 6 events · fingerprint pinned", JSON contains `{skeleton:"wild.json",
+  win_anim:"wild_explode"}` + `targets_config_hash:sha256:f0f39…`; banner green; `tsc --noEmit` clean,
+  no console errors. To be tagged `v0.4.0-beta.7`. Also evaluated the owner's link
+  https://probability.infarom.ro/slots.html (Barboianu, "Mathematics of Slots") — an academic
+  *framework* (Type A/B reels, simple/complex event taxonomy), **not** worked numbers/parity data;
+  recorded as a reference (the certified sheet ~late June 2026 is still the ADR-010 parity gate).
+  **Next (no LLM/cert needed):** fold the engine's exact integer rational into the published artifact;
+  `index.json` ledger of published games; typed `NoFeasibleSolution`; then exact `ways_243`.
 
 ---
 

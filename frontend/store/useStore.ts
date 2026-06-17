@@ -20,8 +20,10 @@ interface State {
   assetText: string;
   assets: string[]; // loaded asset file names
   symbolAsset: Record<number, string>; // symbol id -> chosen asset file name
+  symbolAnims: Record<number, Record<string, string>>; // symbol id -> {idle_anim, land_anim, win_anim, sound_cue}
   eventTypes: string[];
   bindReport: BindReport | null;
+  exportPreview: string | null; // last exported presentation.bind.json (for preview + verification)
 
   setPrompt: (s: string) => void;
   setConfigText: (s: string) => void;
@@ -33,8 +35,10 @@ interface State {
   setAssetText: (s: string) => void;
   loadAssetNames: (names: string[]) => Promise<void>;
   setSymbolAsset: (id: number, name: string) => Promise<void>;
+  setSymbolAnim: (id: number, field: string, value: string) => void;
   clearAssets: () => void;
   doValidateBind: () => Promise<void>;
+  doExportBind: () => Promise<void>;
 }
 
 const msg = (e: unknown) => (e instanceof Error ? e.message : String(e));
@@ -80,6 +84,33 @@ const autoMatch = (
   return next;
 };
 
+// Assemble a full PresentationBind from the chosen assets + per-symbol animations/sounds.
+// A symbol is included if it has an asset OR any animation/sound set (so anim-only symbols still
+// surface as "unrenderable" in validation). Pays of all events are auto-named after the event.
+const buildBinding = (
+  configText: string,
+  symbolAsset: Record<number, string>,
+  symbolAnims: Record<number, Record<string, string>>,
+  eventTypes: string[]
+): PresentationBind => {
+  const symbols = configSymbols(configText)
+    .map((sym): SymbolBinding | null => {
+      const asset = symbolAsset[sym.id];
+      const anims = symbolAnims[sym.id] ?? {};
+      const animEntries = Object.entries(anims).filter(([, v]) => v && v.trim());
+      if (!asset && animEntries.length === 0) return null;
+      const sb: SymbolBinding = asset ? assetToBinding(sym.id, asset) : { symbol_id: sym.id };
+      for (const [k, v] of animEntries) (sb as unknown as Record<string, unknown>)[k] = v.trim();
+      return sb;
+    })
+    .filter((x): x is SymbolBinding => x !== null);
+  return {
+    bind_version: "0.1.0",
+    symbols,
+    events: eventTypes.map((et) => ({ event_type: et, anim: et })),
+  };
+};
+
 export const useStore = create<State>((set, get) => ({
   prompt: "Make a 5x3 slot, 20 paylines, 96% RTP, medium volatility, with wild and scatter",
   configText: "",
@@ -92,8 +123,10 @@ export const useStore = create<State>((set, get) => ({
   assetText: "",
   assets: [],
   symbolAsset: {},
+  symbolAnims: {},
   eventTypes: [],
   bindReport: null,
+  exportPreview: null,
 
   setPrompt: (s) => set({ prompt: s }),
   setConfigText: (s) => set({ configText: s }),
@@ -157,7 +190,13 @@ export const useStore = create<State>((set, get) => ({
     await get().doValidateBind();
   },
 
-  clearAssets: () => set({ assets: [], symbolAsset: {}, bindReport: null, assetText: "" }),
+  setSymbolAnim: (id, field, value) =>
+    set((st) => ({
+      symbolAnims: { ...st.symbolAnims, [id]: { ...(st.symbolAnims[id] ?? {}), [field]: value } },
+    })),
+
+  clearAssets: () =>
+    set({ assets: [], symbolAsset: {}, symbolAnims: {}, bindReport: null, exportPreview: null, assetText: "" }),
 
   doValidateBind: async () => {
     let config: unknown;
@@ -173,18 +212,50 @@ export const useStore = create<State>((set, get) => ({
         eventTypes = (await api.eventTypes()).event_types;
         set({ eventTypes });
       }
-      const { symbolAsset } = get();
-      const symbols = configSymbols(get().configText)
-        .filter((sym) => symbolAsset[sym.id])
-        .map((sym) => assetToBinding(sym.id, symbolAsset[sym.id]));
-      const binding: PresentationBind = {
-        symbols,
-        events: eventTypes.map((et) => ({ event_type: et, anim: et })),
-      };
+      const binding = buildBinding(get().configText, get().symbolAsset, get().symbolAnims, eventTypes);
       const report = await api.validateBind(config, binding);
       set({ bindReport: report, error: null });
     } catch (e) {
       set({ error: "Bind check failed: " + msg(e) });
+    }
+  },
+
+  doExportBind: async () => {
+    let config: unknown;
+    try {
+      config = JSON.parse(get().configText);
+    } catch {
+      set({ error: "Translate or load a valid config before exporting a binding." });
+      return;
+    }
+    try {
+      let eventTypes = get().eventTypes;
+      if (eventTypes.length === 0) {
+        eventTypes = (await api.eventTypes()).event_types;
+        set({ eventTypes });
+      }
+      const binding = buildBinding(get().configText, get().symbolAsset, get().symbolAnims, eventTypes);
+      // Pin the binding to the exact config it targets (the certification fingerprint).
+      try {
+        binding.targets_config_hash = (await api.configHash(config)).config_hash;
+      } catch {
+        /* hash is best-effort; export still works without it */
+      }
+      const json = JSON.stringify(binding, null, 2);
+      set({ exportPreview: json, error: null });
+      if (typeof document !== "undefined") {
+        const blob = new Blob([json], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "presentation.bind.json";
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+      }
+    } catch (e) {
+      set({ error: "Export failed: " + msg(e) });
     }
   },
 }));

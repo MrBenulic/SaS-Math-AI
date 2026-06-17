@@ -106,4 +106,5 @@ export const api = {
     fetch(BASE + "/bind/event-types").then((r) => r.json()) as Promise<{ event_types: string[] }>,
   validateBind: (config: unknown, binding: PresentationBind) =>
     post<BindReport>("/validate-bind", { config, binding }),
+  configHash: (config: unknown) => post<{ config_hash: string }>("/config-hash", config),
 };
