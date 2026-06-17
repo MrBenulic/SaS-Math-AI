@@ -12,7 +12,7 @@ use sas_math_core::enumerate::exact_rtp;
 use sas_math_core::mechanics::Prepared;
 use sas_math_core::outcome::simulate_one_traced;
 use sas_math_core::simulate::monte_carlo;
-use sas_math_core::solver::{realized_config, solve, solve_multi, SolveOptions, SolveTargets};
+use sas_math_core::solver::{realized_config, solve, solve_multi, Feasibility, SolveOptions, SolveTargets};
 use serde::{Deserialize, Serialize};
 use std::io::Read;
 use std::time::Instant;
@@ -84,6 +84,10 @@ struct TuneResponse {
     generations: usize,
     evaluations: usize,
     realize_delta: f64,
+    /// Did the solver reach the requested target(s) within tolerance? (false => over-constrained.)
+    feasible: bool,
+    /// Which target(s) the solver could not meet (empty when feasible).
+    missed_targets: Vec<String>,
 }
 
 fn fail(msg: String) -> ! {
@@ -166,6 +170,11 @@ fn main() {
             };
             let after = metrics(&tuned_prep, seed, 1_000_000);
 
+            let (feasible, missed_targets) = match &res.feasibility {
+                Feasibility::Feasible => (true, Vec::new()),
+                Feasibility::Infeasible { missed, .. } => (false, missed.clone()),
+            };
+
             let resp = TuneResponse {
                 realize_delta: (after.exact_rtp - res.total_rtp).abs(),
                 before,
@@ -175,6 +184,8 @@ fn main() {
                 solver_total_rtp: res.total_rtp,
                 generations: res.generations,
                 evaluations: res.evaluations,
+                feasible,
+                missed_targets,
             };
             println!("{}", serde_json::to_string(&resp).unwrap());
         }

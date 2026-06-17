@@ -20,5 +20,5 @@ pub use config::GameConfig;
 pub use enumerate::{exact_rtp, ExactResult};
 pub use outcome::{simulate_one_traced, LineWin, RoundOutcome, ScatterWin, WinDirection};
 pub use simulate::{monte_carlo, McResult};
-pub use solver::{solve, solve_multi, SolveOptions, SolveResult, SolveTargets};
+pub use solver::{solve, solve_multi, Feasibility, SolveOptions, SolveResult, SolveTargets};
 pub use stats::Accumulator;

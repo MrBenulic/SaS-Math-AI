@@ -224,6 +224,13 @@ git checkout beta                             # do new work on beta, never direc
   `GET /ledger`; `published/` gitignored. **Live-verified**: publish→ledger round-trip lists the game
   with its exact_rtp + exact_line_ratio. **27 Python tests** (+4 ledger). Tagged `v0.4.0-beta.9`.
   **Next:** typed `NoFeasibleSolution` from the solver; exact `ways_243`.
+- **2026-06-16 (solver feasibility)** — Added a typed **`Feasibility`** to `solver.rs` (`Feasible` /
+  `Infeasible { rtp_error, missed }`) computed in `finalize` (RTP tol 1pt; vol/hit 15% rel);
+  `SolveResult.feasible()`; surfaced via `bin/engine.rs` `TuneResponse.feasible` + `missed_targets`.
+  An over-constrained tune now reports a diagnostic instead of a silently-off best effort (ADR-006
+  anti-degeneracy). **25 Rust tests** (+2: infeasible target flagged, feasible target passes).
+  Tagged `v0.4.0-beta.10`. **Next:** exact `ways_243` (whole-grid ways eval + exact enumeration,
+  hand-verified) — the last non-cert engine item; then optional richer LLM intent / Studio publish UI.
 
 ---
 

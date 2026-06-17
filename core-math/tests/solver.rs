@@ -8,7 +8,9 @@ use sas_math_core::config::GameConfig;
 use sas_math_core::enumerate::exact_rtp;
 use sas_math_core::mechanics::Prepared;
 use sas_math_core::simulate::monte_carlo;
-use sas_math_core::solver::{closed_form_rtp, realized_config, solve, solve_multi, SolveOptions, SolveTargets};
+use sas_math_core::solver::{
+    closed_form_rtp, realized_config, solve, solve_multi, Feasibility, SolveOptions, SolveTargets,
+};
 
 fn load(path: &str) -> GameConfig {
     let text = std::fs::read_to_string(path).expect("read config");
@@ -131,6 +133,28 @@ fn multi_objective_hits_rtp_and_volatility() {
     assert!((res.total_rtp - 0.96).abs() < 0.01, "rtp {} off target", res.total_rtp);
     let vol = res.volatility.expect("volatility measured");
     assert!((vol - 3.0).abs() / 3.0 < 0.2, "volatility {} not within 20% of 3.0", vol);
+}
+
+#[test]
+fn solver_flags_infeasible_target() {
+    // An absurd RTP target the bounded weight space cannot reach must be reported Infeasible,
+    // not returned as a silently-off best effort.
+    let cfg = load("examples/broken_lineonly.json");
+    let prep = Prepared::new(&cfg).unwrap();
+    let res = solve(&prep, 50.0, &SolveOptions { generations: 150, ..Default::default() });
+    assert!(!res.feasible(), "RTP target 50.0 should be infeasible (got {})", res.total_rtp);
+    match &res.feasibility {
+        Feasibility::Infeasible { missed, .. } => assert!(missed.contains(&"rtp".to_string())),
+        Feasibility::Feasible => panic!("expected Infeasible"),
+    }
+}
+
+#[test]
+fn solver_feasible_target_is_flagged_feasible() {
+    let cfg = load("examples/broken_lineonly.json");
+    let prep = Prepared::new(&cfg).unwrap();
+    let res = solve(&prep, 0.96, &SolveOptions { generations: 300, ..Default::default() });
+    assert!(res.feasible(), "0.96 should be reachable (got {})", res.total_rtp);
 }
 
 #[test]

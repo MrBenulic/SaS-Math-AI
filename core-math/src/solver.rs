@@ -63,6 +63,19 @@ pub struct SolveTargets {
     pub hit_frequency: Option<f64>,
 }
 
+/// Feasibility tolerances for declaring a tune to have hit its targets.
+const FEAS_RTP_TOL: f64 = 0.01; // 1 RTP point (absolute)
+const FEAS_REL_TOL: f64 = 0.15; // 15% relative, for volatility / hit-frequency
+
+/// Did the solver reach the requested targets within tolerance? A typed signal so an over-constrained
+/// request surfaces a diagnostic instead of a silently-off best-effort result (ADR-006 anti-degeneracy).
+#[derive(Debug, Clone, PartialEq)]
+pub enum Feasibility {
+    Feasible,
+    /// Best effort fell outside tolerance; `missed` names the unmet constraints.
+    Infeasible { rtp_error: f64, missed: Vec<String> },
+}
+
 #[derive(Debug, Clone)]
 pub struct SolveResult {
     pub weights: Vec<Vec<f64>>,
@@ -76,6 +89,13 @@ pub struct SolveResult {
     pub generations: usize,
     pub evaluations: usize,
     pub final_loss: f64,
+    pub feasibility: Feasibility,
+}
+
+impl SolveResult {
+    pub fn feasible(&self) -> bool {
+        matches!(self.feasibility, Feasibility::Feasible)
+    }
 }
 
 // ---------- closed-form objective ----------
@@ -286,7 +306,7 @@ pub fn solve(prep: &Prepared, target_rtp: f64, opts: &SolveOptions) -> SolveResu
         let (total, _, _) = closed_form_rtp(prep, &wv);
         (total - target_rtp).powi(2) + opts.reg * reg_term(x, &x_init)
     });
-    finalize(prep, &weights_from_x(&best_x), target_rtp, None, None, opts.generations, evals, best_f)
+    finalize(prep, &weights_from_x(&best_x), target_rtp, None, None, None, None, opts.generations, evals, best_f)
 }
 
 /// Multi-objective tuning: RTP (closed-form) + optional volatility / hit-frequency (CRN Monte Carlo).
@@ -326,7 +346,10 @@ pub fn solve_multi(prep: &Prepared, base: &GameConfig, targets: &SolveTargets, o
     } else {
         (None, None)
     };
-    finalize(prep, &weights, targets.rtp, vol, hit, opts.generations, evals, best_f)
+    finalize(
+        prep, &weights, targets.rtp, targets.volatility, targets.hit_frequency, vol, hit,
+        opts.generations, evals, best_f,
+    )
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -334,6 +357,8 @@ fn finalize(
     prep: &Prepared,
     weights: &[Vec<f64>],
     target_rtp: f64,
+    target_vol: Option<f64>,
+    target_hit: Option<f64>,
     volatility: Option<f64>,
     hit_frequency: Option<f64>,
     generations: usize,
@@ -342,6 +367,28 @@ fn finalize(
 ) -> SolveResult {
     let (total, line, scatter) = closed_form_rtp(prep, weights);
     let (init_total, _, _) = closed_form_rtp(prep, &initial_weights(prep));
+
+    let rtp_error = (total - target_rtp).abs();
+    let mut missed: Vec<String> = Vec::new();
+    if rtp_error > FEAS_RTP_TOL {
+        missed.push("rtp".to_string());
+    }
+    if let (Some(tv), Some(v)) = (target_vol, volatility) {
+        if tv > 0.0 && (v - tv).abs() / tv > FEAS_REL_TOL {
+            missed.push("volatility".to_string());
+        }
+    }
+    if let (Some(th), Some(h)) = (target_hit, hit_frequency) {
+        if th > 0.0 && (h - th).abs() / th > FEAS_REL_TOL {
+            missed.push("hit_frequency".to_string());
+        }
+    }
+    let feasibility = if missed.is_empty() {
+        Feasibility::Feasible
+    } else {
+        Feasibility::Infeasible { rtp_error, missed }
+    };
+
     SolveResult {
         weights: weights.to_vec(),
         init_rtp: init_total,
@@ -354,6 +401,7 @@ fn finalize(
         generations,
         evaluations,
         final_loss,
+        feasibility,
     }
 }
 
