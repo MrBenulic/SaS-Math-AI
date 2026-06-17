@@ -245,6 +245,14 @@ git checkout beta                             # do new work on beta, never direc
   solver+feasibility, event stream, artifact+ledger, Groq LLM). **Next (non-cert):** Studio Publish
   button (UX over /publish + /ledger); optional: scale exact capped RTP (rank 6), schema→TS codegen,
   PyO3. **Still parked:** certified-game parity (ADR-010) — the only thing gating a stable release.
+- **2026-06-16 (Studio Publish UI)** — Added **"5 · Publish"** to the Slot Studio (`page.tsx` +
+  `lib/api.ts` `publish`/`ledger` + store `doPublish`/`published`/`ledgerCount`): one click runs
+  `/publish {persist}` → shows exact RTP + the SHA-256 **fingerprint** + "ledger holds N games".
+  **Browser-verified**: publish → "Exact RTP 149.19% · fingerprint sha256:f0f39eeb… · ledger holds 2
+  games"; no console errors; `tsc` clean. Tagged `v0.4.0-beta.12`. The full studio loop is now visible
+  end to end: describe (AI or rule) → simulate → tune → bind art → **publish a fingerprinted package**.
+  **Next (non-cert, optional):** scale exact capped RTP (rank 6), schema→TS codegen, PyO3, Playwright
+  E2E. **Blocking stable:** certified-game parity sheet (ADR-010) — owner supplying ~late June 2026.
 
 ---
 

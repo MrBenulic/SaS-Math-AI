@@ -1,5 +1,13 @@
 import { create } from "zustand";
-import { api, BindReport, PresentationBind, SimResult, SymbolBinding, TuneResult } from "@/lib/api";
+import {
+  api,
+  BindReport,
+  PresentationBind,
+  PublishResult,
+  SimResult,
+  SymbolBinding,
+  TuneResult,
+} from "@/lib/api";
 
 interface ConfigSymbol {
   id: number;
@@ -14,7 +22,9 @@ interface State {
   tune: TuneResult | null;
   targetRtp: number;
   useAI: boolean; // use the Groq LLM translator instead of the rule-based one
-  loading: "translate" | "simulate" | "tune" | null;
+  published: PublishResult | null;
+  ledgerCount: number | null;
+  loading: "translate" | "simulate" | "tune" | "publish" | null;
   error: string | null;
 
   // Art binding (the art↔math bridge)
@@ -33,6 +43,7 @@ interface State {
   doTranslate: () => Promise<void>;
   doSimulate: () => Promise<void>;
   doTune: () => Promise<void>;
+  doPublish: () => Promise<void>;
 
   setAssetText: (s: string) => void;
   loadAssetNames: (names: string[]) => Promise<void>;
@@ -120,6 +131,8 @@ export const useStore = create<State>((set, get) => ({
   tune: null,
   targetRtp: 0.96,
   useAI: false,
+  published: null,
+  ledgerCount: null,
   loading: null,
   error: null,
 
@@ -167,9 +180,23 @@ export const useStore = create<State>((set, get) => ({
     try {
       const config = JSON.parse(get().configText);
       const r = await api.tune(config, get().targetRtp, 120);
-      set({ tune: r, configText: JSON.stringify(r.tuned_config, null, 2), sim: null });
+      set({ tune: r, configText: JSON.stringify(r.tuned_config, null, 2), sim: null, published: null });
     } catch (e) {
       set({ error: "Tune failed: " + msg(e) });
+    } finally {
+      set({ loading: null });
+    }
+  },
+
+  doPublish: async () => {
+    set({ loading: "publish", error: null });
+    try {
+      const config = JSON.parse(get().configText);
+      const r = await api.publish(config, 200_000, true);
+      const led = await api.ledger();
+      set({ published: r, ledgerCount: led.published.length });
+    } catch (e) {
+      set({ error: "Publish failed: " + msg(e) });
     } finally {
       set({ loading: null });
     }

@@ -26,8 +26,11 @@ export interface SimResult {
   exact_rtp: number;
   line_rtp: number;
   scatter_rtp: number;
+  exact_line_ratio_num: string;
+  exact_line_ratio_den: string;
   capped_rtp: number | null;
   capped_provenance: string;
+  exact_combos: string;
   mc_rtp: number;
   mc_ci95: number;
   hit_frequency: number;
@@ -35,6 +38,16 @@ export interface SimResult {
   max_win_x: number;
   spins: number;
   throughput_mps: number;
+}
+
+export interface PublishResult {
+  artifact_version: string;
+  schema_version: string;
+  engine_version: string;
+  config_hash: string;
+  config: unknown;
+  results: SimResult;
+  ledger_entry?: { config_hash: string; name: string | null; exact_rtp: number };
 }
 
 export interface Metrics {
@@ -108,4 +121,10 @@ export const api = {
   validateBind: (config: unknown, binding: PresentationBind) =>
     post<BindReport>("/validate-bind", { config, binding }),
   configHash: (config: unknown) => post<{ config_hash: string }>("/config-hash", config),
+  publish: (config: unknown, spins = 200_000, persist = true) =>
+    post<PublishResult>("/publish", { config, spins, persist }),
+  ledger: () =>
+    fetch(BASE + "/ledger").then((r) => r.json()) as Promise<{
+      published: { config_hash: string; name: string | null; exact_rtp: number }[];
+    }>,
 };
