@@ -264,6 +264,20 @@ git checkout beta                             # do new work on beta, never direc
   conformance test already guards the risk); (c) PyO3 native bindings (ADR-007, perf infra — the JSON
   bridge works); (d) Playwright E2E (heavy browser install; preview-tool verification already covers
   it). **Blocking stable:** certified-game parity (ADR-010), owner supplying ~late June 2026.
+- **2026-06-16/17 (UI redesign + hardening kickoff)** — Owner asked for a modern "awwward" UI +
+  bug-proofing. **(1) Redesign** of the Slot Studio (`frontend`): new design system in `globals.css`
+  — **complementary palette: cool indigo (231°) ↔ warm gold (43°)** on deep neutral ink; depth/glass
+  panels, ambient indigo+gold aura + grid texture (lightweight CSS, NO three.js — chose craft over 3D
+  gimmick for a serious tool), Geist fonts (was Arial). **GSAP** (core, 3.15 — `@gsap/react` has a
+  React-19 peer conflict so used core via `useEffect`) for entrance stagger + `AnimatedNumber` count-up
+  on metrics. 5 numbered step cards; gold reserved for the hero RTP + Publish CTA (premium via
+  scarcity). NOTE: Tailwind v4 did NOT emit `@layer components` classes → moved component classes to
+  top-level CSS and dropped `width:100%` from `.field` (callers use w-full/flex-1/w-24). **Browser +
+  prod-build verified** (`npm run build` clean; no console errors; gold EXACT RTP 149.19% rendered).
+  Tagged `v0.4.0-beta.14`. **(2) Hardening** — launched an adversarial multi-agent audit workflow
+  (Rust+Python+frontend, each finding independently verified); fixes + property/fuzz/edge tests land
+  next once it reports. **GSAP yes; three.js deferred to a future *meaningful* 3D viz (reels / win-dist
+  surface), not chrome.**
 
 ---
 

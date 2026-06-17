@@ -1,26 +1,236 @@
 @import "tailwindcss";
 
+/* ─────────────────────────────────────────────────────────────────────────
+   SaS-Math Slot Studio — design system
+   Complementary palette: cool INDIGO (≈231°) ↔ warm GOLD (≈43°), opposite on
+   the wheel, on a deep neutral "ink" base. ~90% neutral; indigo for chrome;
+   gold reserved for the hero metric (RTP) + key CTAs so the accent reads premium.
+   ───────────────────────────────────────────────────────────────────────── */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --ink-950: 222 47% 5%;
+  --ink-900: 222 42% 7.5%;
+  --ink-850: 222 36% 10%;
+  --ink-800: 222 30% 13%;
+  --ink-700: 222 22% 20%;
+  --ink-600: 222 16% 31%;
+  --line: 222 24% 18%;
+  --text: 222 25% 93%;
+  --muted: 222 14% 64%;
+  --faint: 222 12% 46%;
+  --brand: 231 76% 64%;
+  --brand-2: 250 78% 68%;
+  --gold: 43 96% 56%;
+  --gold-2: 33 95% 54%;
+  --ok: 152 62% 47%;
+  --bad: 352 78% 64%;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+html,
+body {
+  height: 100%;
+}
+body {
+  background: hsl(var(--ink-950));
+  color: hsl(var(--text));
+  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* ── Ambient background: low-contrast indigo + gold aurora (lightweight; no WebGL) ── */
+.app-aura {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+.app-aura::before,
+.app-aura::after {
+  content: "";
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(100px);
+}
+.app-aura::before {
+  width: 52vw;
+  height: 52vw;
+  left: -12vw;
+  top: -16vw;
+  background: radial-gradient(circle, hsl(var(--brand) / 0.34), transparent 70%);
+  animation: aura-a 24s ease-in-out infinite alternate;
+}
+.app-aura::after {
+  width: 46vw;
+  height: 46vw;
+  right: -14vw;
+  bottom: -20vw;
+  background: radial-gradient(circle, hsl(var(--gold) / 0.14), transparent 70%);
+  animation: aura-b 28s ease-in-out infinite alternate;
+}
+@keyframes aura-a {
+  to {
+    transform: translate(8vw, 6vh) scale(1.18);
   }
 }
+@keyframes aura-b {
+  to {
+    transform: translate(-7vw, -5vh) scale(1.12);
+  }
+}
+.app-grid {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image: linear-gradient(hsl(var(--line) / 0.6) 1px, transparent 1px),
+    linear-gradient(90deg, hsl(var(--line) / 0.6) 1px, transparent 1px);
+  background-size: 46px 46px;
+  mask-image: radial-gradient(ellipse 80% 55% at 50% 0%, black, transparent 78%);
+  opacity: 0.22;
+}
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+/* ── Component classes (top-level so they reliably apply; do NOT set width — utilities own that) ── */
+.panel {
+  position: relative;
+  border-radius: 16px;
+  background: linear-gradient(180deg, hsl(var(--ink-850) / 0.92), hsl(var(--ink-900) / 0.86));
+  border: 1px solid hsl(var(--line) / 0.9);
+  box-shadow: 0 1px 0 hsl(0 0% 100% / 0.04) inset, 0 12px 34px -16px hsl(222 60% 2% / 0.8);
+  backdrop-filter: blur(10px);
+}
+.step-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 21px;
+  height: 21px;
+  border-radius: 7px;
+  font-size: 11px;
+  font-weight: 700;
+  color: hsl(var(--brand));
+  background: hsl(var(--brand) / 0.14);
+  border: 1px solid hsl(var(--brand) / 0.3);
+}
+.step-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: hsl(var(--muted));
+}
+.field {
+  border-radius: 10px;
+  background: hsl(var(--ink-950) / 0.72);
+  border: 1px solid hsl(var(--line));
+  color: hsl(var(--text));
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.field::placeholder {
+  color: hsl(var(--faint));
+}
+.field:focus {
+  outline: none;
+  border-color: hsl(var(--brand) / 0.75);
+  box-shadow: 0 0 0 3px hsl(var(--brand) / 0.18);
+}
+.btn {
+  border-radius: 11px;
+  font-weight: 600;
+  transition: transform 0.12s ease, filter 0.15s, box-shadow 0.15s, background 0.15s;
+}
+.btn:active:not(:disabled) {
+  transform: translateY(1px) scale(0.997);
+}
+.btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.btn-primary {
+  color: white;
+  background: linear-gradient(180deg, hsl(var(--brand)), hsl(var(--brand-2)));
+  box-shadow: 0 8px 22px -10px hsl(var(--brand) / 0.85);
+}
+.btn-primary:hover:not(:disabled) {
+  filter: brightness(1.08);
+  box-shadow: 0 10px 28px -10px hsl(var(--brand) / 0.95);
+}
+.btn-gold {
+  color: hsl(38 70% 11%);
+  background: linear-gradient(180deg, hsl(var(--gold)), hsl(var(--gold-2)));
+  box-shadow: 0 8px 22px -10px hsl(var(--gold) / 0.75);
+}
+.btn-gold:hover:not(:disabled) {
+  filter: brightness(1.06);
+}
+.btn-soft {
+  color: hsl(var(--text));
+  background: hsl(var(--ink-700) / 0.55);
+  border: 1px solid hsl(var(--line));
+}
+.btn-soft:hover:not(:disabled) {
+  background: hsl(var(--ink-700) / 0.9);
+}
+.btn-ghost {
+  color: hsl(var(--muted));
+  border: 1px solid hsl(var(--line));
+}
+.btn-ghost:hover:not(:disabled) {
+  color: hsl(var(--text));
+  background: hsl(var(--ink-800) / 0.6);
+}
+.stat {
+  border-radius: 12px;
+  padding: 10px 12px;
+  background: hsl(var(--ink-950) / 0.5);
+  border: 1px solid hsl(var(--line) / 0.7);
+}
+.stat-k {
+  font-size: 10px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: hsl(var(--faint));
+}
+.stat-v {
+  font-size: 19px;
+  font-weight: 650;
+  color: hsl(var(--text));
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+}
+.stat-v.hero {
+  color: hsl(var(--gold));
+}
+.dot {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 9999px;
+  box-shadow: 0 0 8px -1px currentColor;
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-thumb {
+  background: hsl(var(--ink-700));
+  border-radius: 8px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--ink-600));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-aura::before,
+  .app-aura::after {
+    animation: none;
+  }
 }
