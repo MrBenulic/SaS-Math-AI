@@ -61,6 +61,16 @@ def test_groq_missing_key_raises(monkeypatch):
         GroqTranslator().translate("anything")
 
 
+def test_rule_translator_detects_ways():
+    cfg = get_translator("rule").translate("5x3 all-ways slot, 243 ways, 96% rtp")
+    assert cfg.line_eval.value == "ways_243"
+
+
+def test_intent_ways_takes_precedence_over_both_ways():
+    cfg = build_from_intent(GameIntent(ways=True, both_ways=True), fallback_name="x")
+    assert cfg.line_eval.value == "ways_243"
+
+
 def test_unknown_provider_raises():
     with pytest.raises(NotImplementedError):
         get_translator("openai")

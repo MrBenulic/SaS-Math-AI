@@ -38,6 +38,7 @@ class GameIntent(BaseModel):
     has_wild: bool = True
     has_scatter: bool = True
     both_ways: bool = False
+    ways: bool = False  # 243-ways / all-ways (whole-grid) evaluation; takes precedence over both_ways
     name: Optional[str] = Field(default=None, max_length=60)
 
 
@@ -50,7 +51,12 @@ def build_from_intent(intent: GameIntent, fallback_name: str) -> GameConfig:
     rtp = intent.rtp
     if rtp is not None and rtp > 1.5:  # the model gave a percentage (e.g. 96) — normalize
         rtp = rtp / 100.0
-    line_eval = LineEval.both_ways if intent.both_ways else LineEval.left_to_right
+    if intent.ways:
+        line_eval = LineEval.ways_243
+    elif intent.both_ways:
+        line_eval = LineEval.both_ways
+    else:
+        line_eval = LineEval.left_to_right
 
     cfg = build_base_config(
         name=(intent.name or fallback_name or "AI slot")[:60],
@@ -88,7 +94,8 @@ class RuleBasedTranslator:
                 rtp = float(m.group(1)) / 100.0
 
         volatility = next((v for v in ["medium-high", "extreme", "high", "medium", "low"] if v in p), None)
-        both_ways = "both ways" in p or "win both ways" in p
+        ways = "243" in p or "all ways" in p or "all-ways" in p or "all way" in p
+        both_ways = not ways and ("both ways" in p or "win both ways" in p)
 
         has_wild = "no wild" not in p and "without wild" not in p
         has_scatter = "no scatter" not in p and "without scatter" not in p
@@ -99,7 +106,7 @@ class RuleBasedTranslator:
 
         intent = GameIntent(
             reels=reels, rows=rows, num_lines=num_lines, rtp=rtp, volatility=volatility,
-            has_wild=has_wild, has_scatter=has_scatter, both_ways=both_ways,
+            has_wild=has_wild, has_scatter=has_scatter, both_ways=both_ways, ways=ways,
         )
         return build_from_intent(intent, fallback_name=prompt.strip())
 
@@ -113,7 +120,8 @@ _SYSTEM_PROMPT = (
     "math engine. You NEVER write code, never invent fields, never produce math. Output ONLY a JSON "
     "object with exactly these keys: reels (int 1-16), rows (int 1-8), num_lines (int 1-200), "
     "rtp (number 0-1 as a fraction, or null), volatility (one of: low, medium, medium-high, high, "
-    "extreme, or null), has_wild (bool), has_scatter (bool), both_ways (bool), name (short string). "
+    "extreme, or null), has_wild (bool), has_scatter (bool), both_ways (bool), ways (bool — true ONLY "
+    "for '243 ways' / 'all-ways' games; takes precedence over both_ways), name (short string). "
     "Map '96% RTP' to rtp 0.96. Pick the closest volatility preset. If something is unspecified use "
     "sensible slot defaults: 5 reels, 3 rows, 20 lines, wild and scatter included."
 )

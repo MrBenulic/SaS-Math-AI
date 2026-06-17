@@ -76,29 +76,55 @@ pub fn simulate_one_traced(prep: &Prepared, master_seed: u64, spin_index: u64) -
         .map(|r| (0..prep.rows).map(|row| grid[r][row]).collect())
         .collect();
 
-    let mut line_syms = [0usize; MAX_REELS];
     let mut line_wins = Vec::new();
     let mut raw: u64 = 0;
-    for (li, line) in prep.paylines.iter().enumerate() {
-        for r in 0..prep.reels {
-            line_syms[r] = grid[r][line[r]];
-        }
-        for d in prep.line_wins(&line_syms[..prep.reels]) {
+    if prep.is_ways() {
+        // 243-ways: whole-grid, one win per symbol; cells are every matching cell in the run's reels.
+        for (wi, d) in prep.ways_wins(&grid).into_iter().enumerate() {
             raw = raw.saturating_add(d.pay);
-            let cells: Vec<(usize, usize)> = if d.reversed {
-                // run of length `count` anchored at the rightmost reel
-                ((prep.reels - d.count)..prep.reels).map(|r| (r, line[r])).collect()
-            } else {
-                (0..d.count).map(|r| (r, line[r])).collect()
-            };
+            let s_is_wild = prep.is_wild[d.symbol];
+            let mut cells: Vec<(usize, usize)> = Vec::new();
+            for r in 0..d.run {
+                for row in 0..prep.rows {
+                    let cell = grid[r][row];
+                    let m = if s_is_wild { cell == d.symbol } else { cell == d.symbol || prep.is_wild[cell] };
+                    if m {
+                        cells.push((r, row));
+                    }
+                }
+            }
             line_wins.push(LineWin {
-                line_index: li,
+                line_index: wi,
                 symbol: d.symbol,
-                count: d.count,
-                direction: if d.reversed { WinDirection::RightToLeft } else { WinDirection::LeftToRight },
+                count: d.run,
+                direction: WinDirection::LeftToRight,
                 pay_units: d.pay,
                 cells,
             });
+        }
+    } else {
+        let mut line_syms = [0usize; MAX_REELS];
+        for (li, line) in prep.paylines.iter().enumerate() {
+            for r in 0..prep.reels {
+                line_syms[r] = grid[r][line[r]];
+            }
+            for d in prep.line_wins(&line_syms[..prep.reels]) {
+                raw = raw.saturating_add(d.pay);
+                let cells: Vec<(usize, usize)> = if d.reversed {
+                    // run of length `count` anchored at the rightmost reel
+                    ((prep.reels - d.count)..prep.reels).map(|r| (r, line[r])).collect()
+                } else {
+                    (0..d.count).map(|r| (r, line[r])).collect()
+                };
+                line_wins.push(LineWin {
+                    line_index: li,
+                    symbol: d.symbol,
+                    count: d.count,
+                    direction: if d.reversed { WinDirection::RightToLeft } else { WinDirection::LeftToRight },
+                    pay_units: d.pay,
+                    cells,
+                });
+            }
         }
     }
 

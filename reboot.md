@@ -231,6 +231,20 @@ git checkout beta                             # do new work on beta, never direc
   anti-degeneracy). **25 Rust tests** (+2: infeasible target flagged, feasible target passes).
   Tagged `v0.4.0-beta.10`. **Next:** exact `ways_243` (whole-grid ways eval + exact enumeration,
   hand-verified) — the last non-cert engine item; then optional richer LLM intent / Studio publish UI.
+- **2026-06-16 (243-ways support, end to end)** — Implemented **`ways_243`** (was a fail-loud stub):
+  whole-grid all-ways evaluation. `mechanics.rs` `ways_pay`/`ways_wins` (per-symbol left-anchored run,
+  ways = product of per-reel symbol-or-wild counts, pay = `pays[s][run]*ways`); `simulate.rs` +
+  `outcome.rs` branch on `is_ways()`; **exact closed-form** `enumerate.rs::ways_rtp_exact` (product of
+  per-reel mean counts × tail `P(count==0)`; works for Strips via empirical per-reel count dist and
+  Weights via Binomial — reels independent so the expectation factorizes; zero sampling error, f64).
+  Translators expose it (`GameIntent.ways`, rule detects "243"/"all-ways", Groq prompt). **Verified**:
+  exact == BY-HAND `29/8 = 3.625` (direct 8-grid enumeration) for BOTH reel models; exact == MC within
+  CI; thread-independent; all-A 3x3 pays 243×; engine-bridge live `exact 3.625`, MC `3.6198±0.0089`.
+  **28 Rust + 29 Python tests** (+3 ways, +2 translator). Tagged `v0.4.0-beta.11`. **Engine roadmap is
+  now feature-complete for the non-cert path** (lines/both-ways/ways, scatter, wild, cap, exact+MC,
+  solver+feasibility, event stream, artifact+ledger, Groq LLM). **Next (non-cert):** Studio Publish
+  button (UX over /publish + /ledger); optional: scale exact capped RTP (rank 6), schema→TS codegen,
+  PyO3. **Still parked:** certified-game parity (ADR-010) — the only thing gating a stable release.
 
 ---
 

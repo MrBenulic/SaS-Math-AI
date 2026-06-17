@@ -40,6 +40,17 @@ pub struct LineWinDetail {
     pub pay: u64,
 }
 
+/// One winning symbol in a 243-ways (all-ways) spin: a left-anchored run of `run` reels, each
+/// containing `≥1` of the symbol-or-wild; `ways` = product of those per-reel counts; `pay` =
+/// `pays[symbol][run] * ways`.
+#[derive(Debug, Clone, Copy)]
+pub struct WaysWinDetail {
+    pub symbol: usize,
+    pub run: usize,
+    pub ways: u64,
+    pub pay: u64,
+}
+
 pub struct Prepared {
     pub reels: usize,
     pub rows: usize,
@@ -83,16 +94,6 @@ impl Prepared {
         }
         if rows == 0 || rows > MAX_ROWS {
             return Err(format!("rows must be 1..={MAX_ROWS}, got {rows}"));
-        }
-        // `ways_243` line pays are not implemented yet. Reject loudly rather than silently paying
-        // zero — a wrong-but-plausible RTP must never reach a config (line_eval is the #1 place
-        // parity fails). Re-enable once exact all-ways math + a certified parity sheet exist.
-        if cfg.line_eval == LineEval::Ways243 {
-            return Err(
-                "line_eval 'ways_243' is not yet implemented (it would silently pay zero); \
-                 use 'left_to_right' or 'both_ways'"
-                    .into(),
-            );
         }
 
         let n_symbols = cfg.symbols.iter().map(|s| s.id).max().map(|m| m + 1).unwrap_or(0);
@@ -380,5 +381,82 @@ impl Prepared {
             Some(id) => self.pays[id][count.min(self.max_count)],
             None => 0,
         }
+    }
+
+    /// Number of cells in reel `r`'s visible window that count toward symbol `s` (itself, or — for a
+    /// non-wild `s` — a wild). Shared by 243-ways MC and the exact ways math.
+    #[inline]
+    fn ways_count(&self, grid: &[[usize; MAX_ROWS]; MAX_REELS], r: usize, s: usize) -> u64 {
+        let s_is_wild = self.is_wild[s];
+        let mut c = 0u64;
+        for row in 0..self.rows {
+            let cell = grid[r][row];
+            let matches = if s_is_wild { cell == s } else { cell == s || self.is_wild[cell] };
+            if matches {
+                c += 1;
+            }
+        }
+        c
+    }
+
+    /// 243-ways (all-ways) total pay for a visible grid: for each non-scatter symbol, the
+    /// left-anchored run of reels with `≥1` symbol-or-wild, paying `pays[symbol][run] * (product of
+    /// per-reel counts)`. Whole-grid (paylines are not used in ways games).
+    pub fn ways_pay(&self, grid: &[[usize; MAX_ROWS]; MAX_REELS]) -> u64 {
+        let mut total = 0u64;
+        for s in 0..self.n_symbols {
+            if self.is_scatter[s] {
+                continue;
+            }
+            let mut ways: u64 = 1;
+            let mut run = 0usize;
+            for r in 0..self.reels {
+                let c = self.ways_count(grid, r, s);
+                if c == 0 {
+                    break;
+                }
+                ways = ways.saturating_mul(c);
+                run += 1;
+            }
+            if run >= 1 && run <= self.max_count {
+                let pay = self.pays[s][run];
+                if pay > 0 {
+                    total = total.saturating_add(pay.saturating_mul(ways));
+                }
+            }
+        }
+        total
+    }
+
+    /// Per-symbol 243-ways wins for the traced/replay outcome stream. Pays sum to [`Self::ways_pay`].
+    pub fn ways_wins(&self, grid: &[[usize; MAX_ROWS]; MAX_REELS]) -> Vec<WaysWinDetail> {
+        let mut out = Vec::new();
+        for s in 0..self.n_symbols {
+            if self.is_scatter[s] {
+                continue;
+            }
+            let mut ways: u64 = 1;
+            let mut run = 0usize;
+            for r in 0..self.reels {
+                let c = self.ways_count(grid, r, s);
+                if c == 0 {
+                    break;
+                }
+                ways = ways.saturating_mul(c);
+                run += 1;
+            }
+            if run >= 1 && run <= self.max_count {
+                let pay = self.pays[s][run].saturating_mul(ways);
+                if pay > 0 {
+                    out.push(WaysWinDetail { symbol: s, run, ways, pay });
+                }
+            }
+        }
+        out
+    }
+
+    #[inline]
+    pub fn is_ways(&self) -> bool {
+        self.line_eval == LineEval::Ways243
     }
 }

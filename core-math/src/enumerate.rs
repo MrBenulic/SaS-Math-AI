@@ -43,6 +43,21 @@ pub struct CappedEnum {
 }
 
 pub fn exact_rtp(prep: &Prepared) -> ExactResult {
+    if prep.is_ways() {
+        let ways = ways_rtp_exact(prep);
+        let scatter_rtp = scatter_rtp_exact(prep);
+        return ExactResult {
+            rtp: ways + scatter_rtp,
+            line_rtp: ways,
+            scatter_rtp,
+            // Ways RTP is a closed-form expectation (product of per-reel means) — not a single integer
+            // ratio — so the rational is left empty (0/0); the f64 above is the exact theoretical value.
+            line_ratio: Rational { num: 0, den: 0 },
+            capped: None,
+            combos: 0,
+            note: "ways(243) = exact closed-form over per-reel count distributions; scatter as usual; capped via numeric MC tail",
+        };
+    }
     let (line_num, line_den) = line_exact(prep);
     let line_rtp = if line_den == 0 { 0.0 } else { line_num as f64 / line_den as f64 };
     let scatter_rtp = scatter_rtp_exact(prep);
@@ -100,6 +115,79 @@ fn binom(n: usize, k: usize) -> f64 {
         r = r * (n - i) as f64 / (i + 1) as f64;
     }
     r
+}
+
+/// Per-reel stats for a 243-ways symbol: `(mean count of s-or-wild, P(count == 0))` over reel `r`'s
+/// visible window. Strips -> empirical over all stops; Weights -> Binomial(rows, p).
+fn ways_reel_stats(prep: &Prepared, r: usize, s: usize) -> (f64, f64) {
+    let s_is_wild = prep.is_wild[s];
+    match prep.model {
+        ReelModel::Strips => {
+            let cols = &prep.columns[r];
+            let n = cols.len() as f64;
+            let (mut sum, mut zero) = (0.0f64, 0.0f64);
+            for col in cols {
+                let mut c = 0u32;
+                for row in 0..prep.rows {
+                    let cell = col.syms[row];
+                    let m = if s_is_wild { cell == s } else { cell == s || prep.is_wild[cell] };
+                    if m {
+                        c += 1;
+                    }
+                }
+                sum += c as f64;
+                if c == 0 {
+                    zero += 1.0;
+                }
+            }
+            if n == 0.0 { (0.0, 1.0) } else { (sum / n, zero / n) }
+        }
+        ReelModel::Weights => {
+            let rs = prep.reel_size[r] as f64;
+            if rs <= 0.0 {
+                return (0.0, 1.0);
+            }
+            let p = if s_is_wild {
+                prep.sym_count[r][s] as f64 / rs
+            } else {
+                let wild_w: u64 = (0..prep.n_symbols)
+                    .filter(|&w| prep.is_wild[w])
+                    .map(|w| prep.sym_count[r][w])
+                    .sum();
+                (prep.sym_count[r][s] + wild_w) as f64 / rs
+            };
+            (prep.rows as f64 * p, (1.0 - p).powi(prep.rows as i32))
+        }
+    }
+}
+
+/// Exact 243-ways RTP as a closed-form expectation: for each non-scatter symbol, the run pays
+/// `pays[s][K] * (product of per-reel mean counts over reels 0..K)`, weighted by `P(count==0)` at the
+/// run-ending reel. Reels are independent (per-reel stop / independent cells), so the expectation
+/// factorizes. Zero sampling error; rendered in f64.
+fn ways_rtp_exact(prep: &Prepared) -> f64 {
+    let bet = prep.bet_units as f64;
+    if bet <= 0.0 {
+        return 0.0;
+    }
+    let reels = prep.reels;
+    let mut total = 0.0f64;
+    for s in 0..prep.n_symbols {
+        if prep.is_scatter[s] {
+            continue;
+        }
+        let stats: Vec<(f64, f64)> = (0..reels).map(|r| ways_reel_stats(prep, r, s)).collect();
+        let mut prod = 1.0f64; // product of mean counts over reels 0..K-1
+        for k in 1..=reels {
+            prod *= stats[k - 1].0;
+            let pay = if k <= prep.max_count { prep.pays[s][k] } else { 0 };
+            if pay > 0 {
+                let tail = if k < reels { stats[k].1 } else { 1.0 }; // P(run ends after reel K-1)
+                total += pay as f64 * prod * tail;
+            }
+        }
+    }
+    total / bet
 }
 
 fn scatter_rtp_exact(prep: &Prepared) -> f64 {
@@ -171,7 +259,8 @@ fn scatter_rtp_exact(prep: &Prepared) -> f64 {
 /// Exact capped RTP via column-tuple enumeration (Strips only). `None` for Weights or when the
 /// space exceeds `ENUM_LIMIT`.
 pub fn enumerate_capped(prep: &Prepared) -> Option<CappedEnum> {
-    if prep.model != ReelModel::Strips {
+    if prep.model != ReelModel::Strips || prep.is_ways() {
+        // The capped walk is payline-based; ways games use the whole-grid `ways_pay` instead.
         return None;
     }
     let mut d: u128 = 1;

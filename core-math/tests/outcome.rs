@@ -147,7 +147,9 @@ fn golden_replay_sample_5x3_spin1() {
 }
 
 #[test]
-fn ways_243_is_rejected_loudly() {
+fn ways_243_is_supported_and_pays() {
+    // A 3x3 grid that is all-A: each reel shows 3 A's -> run 3, ways = 3*3*3 = 27, pays[A][3]=9,
+    // so the spin pays 9*27 = 243x. (ways_243 used to be rejected; it is now implemented.)
     let json = r#"{
       "schema_version":"0.1.0",
       "game":{"name":"w","grid":{"reels":3,"rows":3},"bet_units":1,"denomination_scale":1},
@@ -159,6 +161,15 @@ fn ways_243_is_rejected_loudly() {
       "max_win":{"cap_x":1000000},
       "rng":{"generator":"chacha","master_seed":1}
     }"#;
-    let result = Prepared::new(&GameConfig::from_json_str(json).unwrap());
-    assert!(result.is_err(), "ways_243 must be rejected, not silently zero-paying");
+    let prep = Prepared::new(&GameConfig::from_json_str(json).unwrap()).expect("ways_243 now supported");
+    assert!(prep.is_ways());
+
+    let o = simulate_one_traced(&prep, 1, 0);
+    assert_eq!(o.total_win_units, 243, "all-A 243-ways should pay 9 * 27 = 243");
+    assert_eq!(o.line_wins.len(), 1);
+    assert_eq!((o.line_wins[0].symbol, o.line_wins[0].count), (0, 3));
+
+    // exact closed-form agrees (deterministic single-outcome game)
+    let e = sas_math_core::enumerate::exact_rtp(&prep);
+    assert!((e.rtp - 243.0).abs() < 1e-9, "exact ways RTP {} != 243", e.rtp);
 }

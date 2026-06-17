@@ -61,12 +61,16 @@ pub fn simulate_one(prep: &Prepared, master_seed: u64, spin_index: u64) -> u64 {
     fill_grid(prep, &mut rng, &mut grid);
 
     let mut total: u64 = 0;
-    let mut line_syms = [0usize; MAX_REELS];
-    for line in &prep.paylines {
-        for r in 0..prep.reels {
-            line_syms[r] = grid[r][line[r]];
+    if prep.is_ways() {
+        total = prep.ways_pay(&grid);
+    } else {
+        let mut line_syms = [0usize; MAX_REELS];
+        for line in &prep.paylines {
+            for r in 0..prep.reels {
+                line_syms[r] = grid[r][line[r]];
+            }
+            total = total.saturating_add(prep.line_pay(&line_syms[..prep.reels]));
         }
-        total = total.saturating_add(prep.line_pay(&line_syms[..prep.reels]));
     }
 
     if prep.scatter_id.is_some() {
