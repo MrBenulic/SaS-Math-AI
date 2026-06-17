@@ -12,6 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, ValidationError
 
 from . import engine as eng
+from . import ledger
 from .artifact import build_published_artifact, config_hash
 from .binding import EVENT_TYPES, PresentationBind, validate_binding
 from .mechanics import VOLATILITY_PRESETS
@@ -59,6 +60,7 @@ class BindValidateReq(BaseModel):
 class PublishReq(BaseModel):
     config: GameConfig
     spins: int = 2_000_000
+    persist: bool = False  # also record the artifact in the file-backed ledger
 
 
 @app.get("/health")
@@ -86,12 +88,22 @@ def config_hash_endpoint(config: GameConfig) -> dict[str, str]:
 
 @app.post("/publish")
 def publish(r: PublishReq) -> dict[str, Any]:
-    """Build a reproducible published-math artifact: fingerprint + canonical config + engine results."""
+    """Build a reproducible published-math artifact: fingerprint + canonical config + engine results.
+    With `persist`, also record it in the file-backed ledger (index.json)."""
     try:
         results = eng.simulate(r.config.model_dump(), r.spins)
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
-    return build_published_artifact(r.config, results)
+    artifact = build_published_artifact(r.config, results)
+    if r.persist:
+        artifact["ledger_entry"] = ledger.record(artifact)
+    return artifact
+
+
+@app.get("/ledger")
+def get_ledger() -> dict[str, Any]:
+    """The compact index of all published artifacts (content-addressed by config fingerprint)."""
+    return {"published": ledger.read_index()}
 
 
 @app.post("/translate")

@@ -38,6 +38,8 @@ flamegraph.svg
 /sim-output/
 /artifacts/
 *.tuned.json
+# Published-math ledger (local file-backed store; not a source artifact)
+published/
 
 # ---- OS / editor ----
 .DS_Store

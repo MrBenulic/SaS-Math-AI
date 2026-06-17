@@ -49,8 +49,14 @@ struct SimResponse {
     exact_rtp: f64,
     line_rtp: f64,
     scatter_rtp: f64,
+    // Integer-exact line RTP as a rational `num/den` (ADR-002/009). u128 rendered as decimal strings
+    // so no precision is lost crossing JSON. This is the certification-grade number; the floats above
+    // are convenience renders. (Scatter is integer for Strips, binomial-f64 for Weights — see note.)
+    exact_line_ratio_num: String,
+    exact_line_ratio_den: String,
     capped_rtp: Option<f64>,
     capped_provenance: String,
+    exact_combos: String,
     mc_rtp: f64,
     mc_ci95: f64,
     hit_frequency: f64,
@@ -121,8 +127,11 @@ fn main() {
                 exact_rtp: exact.rtp,
                 line_rtp: exact.line_rtp,
                 scatter_rtp: exact.scatter_rtp,
+                exact_line_ratio_num: exact.line_ratio.num.to_string(),
+                exact_line_ratio_den: exact.line_ratio.den.to_string(),
                 capped_rtp: exact.capped,
                 capped_provenance: exact.capped_provenance().to_string(),
+                exact_combos: exact.combos.to_string(),
                 mc_rtp: acc.rtp(),
                 mc_ci95: acc.rtp_ci95(prep.bet_units),
                 hit_frequency: acc.hit_frequency(),

@@ -216,6 +216,14 @@ git checkout beta                             # do new work on beta, never direc
   test) + frontend `tsc` clean, no console errors. To be tagged `v0.4.0-beta.8`. Default translator is
   still rule-based (no key needed); Groq is opt-in. **Next:** richer LLM intent (cap_x, grid presets),
   exact integer rational in the published artifact, `index.json` ledger, typed `NoFeasibleSolution`.
+- **2026-06-16 (exact rational + ledger)** — Strengthened the cert artifact: `bin/engine.rs`
+  `SimResponse` now emits the **integer-exact line RTP as a rational** (`exact_line_ratio_num/den` as
+  u128 decimal strings, ADR-002/009) + `exact_combos`; verified 584886030/671088640 == line_rtp on the
+  sample (33.5M combos). Added a **file-backed published-math ledger** `ai-layer/app/ledger.py`
+  (`record`/`read_index`, content-addressed, upsert-by-fingerprint), `POST /publish {persist:true}` +
+  `GET /ledger`; `published/` gitignored. **Live-verified**: publish→ledger round-trip lists the game
+  with its exact_rtp + exact_line_ratio. **27 Python tests** (+4 ledger). Tagged `v0.4.0-beta.9`.
+  **Next:** typed `NoFeasibleSolution` from the solver; exact `ways_243`.
 
 ---
 
